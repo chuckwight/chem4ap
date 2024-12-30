@@ -1,0 +1,7 @@
+indexes:
+
+- kind: APChemTopic
+  properties:
+  - name: unitId
+  - name: topicNumber
+
