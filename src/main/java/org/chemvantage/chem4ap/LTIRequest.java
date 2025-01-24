@@ -87,7 +87,6 @@ public class LTIRequest extends HttpServlet {
 			out.println("ResponDog Launch Failed: " + e.getMessage()==null?e.toString():e.getMessage());
 			response.sendError(401, "ResponDog Launch Failed: " + e.getMessage()==null?e.toString():e.getMessage());
 		}
-
 	}
 	
 	private String deepLinkingResponseMessage(User user, JsonObject claims, String iss) throws Exception {

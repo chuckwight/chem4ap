@@ -24,25 +24,17 @@ public class Util {
 	@Id static Long id = 1L;
 	private static double avgStars = 0;
 	private static int nStarReports = 0;
-	private static String HMAC256Secret;
-	private static String reCaptchaSecret;
-	private static String reCaptchaSiteKey;
-	private static String salt;
-	private static String announcement;
-	private static String sendGridAPIKey;
+	private static String HMAC256Secret = "ChangeMe";
+	private static String reCaptchaSecret = "ChangeMe";
+	private static String reCaptchaSiteKey = "ChangeMe";
+	private static String salt = "ChangeMe";
+	private static String announcement = "ChangeMe";
+	private static String sendGridAPIKey = "ChangeMe";
 	
 	@Ignore static final String projectId = ServiceOptions.getDefaultProjectId();
 	
 	static Util u;
 	
-	static {
-		try {  // retrieve values from datastore when a new software version is installed
-			if (u == null) u = ofy().load().type(Util.class).id(1L).safe();
-		} catch (Exception e) { // this will run only once when project is initiated
-			u = new Util();
-			ofy().save().entity(u);
-		}
-	}
 	
 	private Util() {}
 	
@@ -103,26 +95,32 @@ public class Util {
 	}
 
 	static String getHMAC256Secret() { 
+		refresh();
 		return HMAC256Secret; 
 	}
 
 	static String getReCaptchaSecret() {
+		refresh();
 		return reCaptchaSecret;
 	}
 
-	public static String getReCaptchaSiteKey() {
+	static String getReCaptchaSiteKey() {
+		refresh();
 		return reCaptchaSiteKey;
 	}
 
 	static String getSalt() { 
+		refresh();
 		return salt; 
 	}
 
-	public static String getAnnouncement() { 
+	static String getAnnouncement() { 
+		refresh();
 		return announcement; 
 	}
 
 	static String getSendGridKey() {
+		refresh();
 		return sendGridAPIKey;
 	}
 	
@@ -132,6 +130,15 @@ public class Util {
 		return null;
 	}
 	
+	static void refresh() {
+		try {  // retrieve values from datastore when a new software version is installed
+			if (u == null) u = ofy().load().type(Util.class).id(1L).safe();
+		} catch (Exception e) { // this will run only once when project is initiated
+			u = new Util();
+			ofy().save().entity(u);
+		}
+	}
+
 	static void sendEmail(String recipientName, String recipientEmail, String subject, String message) 
 			throws IOException {
 		Email from = new Email("admin@chemvantage.org","ChemVantage LLC");
