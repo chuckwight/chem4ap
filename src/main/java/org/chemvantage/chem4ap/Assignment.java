@@ -17,8 +17,11 @@
 
 package org.chemvantage.chem4ap;
 
+import java.util.ArrayList;
 import java.util.Date;
+import java.util.List;
 
+import com.googlecode.objectify.Key;
 import com.googlecode.objectify.annotation.Entity;
 import com.googlecode.objectify.annotation.Id;
 import com.googlecode.objectify.annotation.Index;
@@ -34,14 +37,20 @@ public class Assignment implements java.lang.Cloneable {
 	@Index	public	String lti_ags_lineitem_url;
 	@Index	Date valid;
 			String lti_nrps_context_memberships_url;
-			String title = "Group Poll";
-			boolean pollIsClosed=true;
-			Date pollClosesAt = null;
-			Integer questionNumber;
-			//List<Key<Question>> questionKeys = new ArrayList<Key<Question>>();
-			//List<Integer> timeAllowed = new ArrayList<Integer>();  // time for each question in seconds
-
+			String title;
+			Long unitId;
+			List<Long> topicIds = new ArrayList<Long>();
+			List<Key<Question>> questionKeys = new ArrayList<Key<Question>>();
+			
 	Assignment() {}
+	
+	Assignment(String assignmentType, String title, Long unitId, String platform_deployment_id) {
+		this.assignmentType = assignmentType;
+		this.title = title;
+		this.unitId = unitId;
+		this.platform_deployment_id = platform_deployment_id;
+		this.created = new Date();
+	}
 
 	protected Assignment clone() throws CloneNotSupportedException {
 		return (Assignment) super.clone();

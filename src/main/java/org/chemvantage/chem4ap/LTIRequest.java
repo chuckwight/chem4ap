@@ -12,6 +12,7 @@ import java.util.Base64;
 import java.util.Base64.Encoder;
 import java.util.Date;
 import java.util.Iterator;
+import java.util.List;
 
 import com.auth0.jwk.Jwk;
 import com.auth0.jwk.JwkProvider;
@@ -24,6 +25,7 @@ import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
+import com.google.gson.JsonPrimitive;
 
 import jakarta.servlet.annotation.WebServlet;
 import jakarta.servlet.http.HttpServlet;
@@ -36,6 +38,13 @@ public class LTIRequest extends HttpServlet {
 	private static final long serialVersionUID = 137L;
 
 	@Override
+	public void doGet(HttpServletRequest request, HttpServletResponse response) 
+			throws IOException {
+		// Temporary hack for launching the SPA. Normally, this servlet does not accept GET requests
+		response.sendRedirect("/?t=" + Util.getToken("chuck"));
+	}
+	
+	@Override
 	public void doPost(HttpServletRequest request, HttpServletResponse response) 
 			throws IOException {
 		// This servlet receives and processes valid LtiLauchRequests and LtiDeepLinkingRequests
@@ -43,16 +52,11 @@ public class LTIRequest extends HttpServlet {
 		response.setContentType("text/html");
 		PrintWriter out = response.getWriter();
 		
-		// Valid id_token and state parameters are required.
-		String id_token = request.getParameter("id_token");
-		String state = request.getParameter("state");
-		
 		try {
+			String id_token = request.getParameter("id_token");
 			if (id_token==null) throw new Exception("id_token was missing");  
-			if (state==null) throw new Exception("state parameter was missing"); 
 			
 			String iss = "https://" + request.getServerName();
-			validateStateToken(iss,state);
 			JsonObject claims = null;
 			try {
 				claims = JsonParser.parseString(new String(Base64.getUrlDecoder().decode(JWT.decode(id_token).getPayload()))).getAsJsonObject();
@@ -60,36 +64,92 @@ public class LTIRequest extends HttpServlet {
 				throw new Exception("id_token was not a valid JWT.");
 			}
 			Deployment d = validateClaims(claims);
-			validateTokenSignature(id_token,d.well_known_jwks_url);
+			validateTokenSignature(id_token,d.well_known_jwks_url);			
 			
-			User user = validateUserClaims(claims);
+			User user = null;
+			String sig = request.getParameter("sig");
+			if (sig != null) {  // instructor returning with chosen assignment
+				user = User.getUser(sig);
+				if (user==null) throw new Exception("Invalid or expired User entity.");
+			} else {  // new DeepLinking request
+				String state = request.getParameter("state");
+				if (state==null) throw new Exception("state parameter was missing"); 
+				validateStateToken(iss, state); // ensures proper OIDC authorization flow completed							
+				user = validateUserClaims(claims);
+				user.setToken();
+			}
 			
 			// request is for ResourceLink or DeepLinking?
 			JsonElement message_type = claims.get("https://purl.imsglobal.org/spec/lti/claim/message_type");
-			if (message_type == null) throw new Exception("Missing LTI message_type.");
+			
 			switch (message_type.getAsString()) {
 			case "LtiDeepLinkingRequest":
 				if (!user.isInstructor()) throw new Exception("You must be logged as an instructor for this.");
-				JsonElement deep_linking_settings = claims.get("https://purl.imsglobal.org/spec/lti-dl/claim/deep_linking_settings");
-				if (deep_linking_settings == null) throw new Exception("Required settings claim was not found.");
-				user.setToken();
-				out.println(Util.head("DeepLinking") + deepLinkingResponseMessage(user,claims,iss) + Util.foot());
+				String userRequest = request.getParameter("UserRequest");
+				if (userRequest==null) userRequest = "";
+				switch (userRequest) {
+				case "Select assignment":
+					JsonElement deep_linking_settings = claims.get("https://purl.imsglobal.org/spec/lti-dl/claim/deep_linking_settings");
+					if (deep_linking_settings == null) throw new Exception("Required settings claim was not found.");
+					String assignmentType = request.getParameter("AssignmentType");
+					Long unitId = Long.parseLong(request.getParameter("UnitId"));
+					out.println(deepLinkingResponseMessage(user,claims,iss,assignmentType,unitId));
+					break;
+				default:
+					out.println(contentPickerForm(user,request,claims));
+				}
 				break;
 			case "LtiResourceLinkRequest":
 				Assignment a = getMyAssignment(user,claims,d,request);
 				if (a==null) throw new Exception("Assignnent is null");
 				user.setAssignment(a.id);
-				response.sendRedirect(Util.getServerUrl() + "/" + a.assignmentType + "?sig=" + user.getTokenSignature());
+				response.sendRedirect(Util.getServerUrl() + "/exercises/index.html?t=" + Util.getToken(user.getTokenSignature()));
 				break;
 			default: throw new Exception("The LTI message_type claim " + message_type.getAsString() + " is not supported.");
 			}						
 		} catch (Exception e) {
-			out.println("ResponDog Launch Failed: " + e.getMessage()==null?e.toString():e.getMessage());
-			response.sendError(401, "ResponDog Launch Failed: " + e.getMessage()==null?e.toString():e.getMessage());
+			out.println("Chem4AP Launch Failed: " + e.getMessage()==null?e.toString():e.getMessage());
+			//response.sendError(401, "Chem4AP Launch Failed: " + e.getMessage()==null?e.toString():e.getMessage());
 		}
 	}
 	
-	private String deepLinkingResponseMessage(User user, JsonObject claims, String iss) throws Exception {
+	static String contentPickerForm(User user, HttpServletRequest request,JsonObject claims) throws Exception {
+		StringBuffer buf = new StringBuffer(Util.head("Chem4AP Assignment Setup"));
+		try {
+		JsonObject settings = claims.get("https://purl.imsglobal.org/spec/lti-dl/claim/deep_linking_settings").getAsJsonObject();
+		boolean acceptsLtiResourceLink = settings.get("accept_types").getAsJsonArray().contains(new JsonPrimitive("ltiResourceLink"));
+		if (!acceptsLtiResourceLink) throw new Exception("Deep Link request failed because platform does not accept new LtiResourceLinks.");
+		
+		buf.append("<h1>Chem4AP Assignment Setup</h1>");
+
+		buf.append("<form name=AssignmentForm action=/lti method=POST>");
+		buf.append("<input type=hidden name=id_token value='" + request.getParameter("id_token") + "' />");
+		buf.append("<input type=hidden name=sig value='" + user.getTokenSignature() + "' />");
+		buf.append("<input type=hidden name=UserRequest value='Select assignment' />");
+		
+		String assignmentType = request.getParameter("AssignmentType");
+		if (assignmentType==null) assignmentType="";
+		
+		buf.append("<h2>Select the type of assignment to create:</h2>");
+		buf.append("<div><label><input type=radio name=AssignmentType required value='Exercises' />Exercises</label></div>"
+				+ "<div><label><input type=radio name=AssignmentType required value='Homework' />Homework</label></div>");
+		List<APChemUnit> units = null;
+		units = ofy().load().type(APChemUnit.class).list();
+		buf.append("<h2>Please select one of the AP Chemistry units below:</h2>");
+		for (APChemUnit u : units) {
+			buf.append("<div><label><input type=radio name=UnitId required value=" + u.id + " />" + u.title + "</label></div>");
+		}
+		buf.append("<br/>");
+		buf.append("<input type=submit value='Create this assignment' />");
+
+		buf.append(Util.foot());
+		} catch (Exception e) {
+			buf.append(e.toString() + " " + e.getMessage());
+		}
+		return buf.toString();
+	}
+	
+	private String deepLinkingResponseMessage(User user, JsonObject claims, String iss, String assignmentType, Long unitId) throws Exception {
 		StringBuffer buf = new StringBuffer();
 		StringBuffer debug = new StringBuffer();
 		String deep_link_return_url = null;
@@ -103,16 +163,13 @@ public class LTIRequest extends HttpServlet {
 			Date now = new Date();
 			Date exp = new Date(now.getTime() + 5400000L); // 90 minutes from now
 			Deployment d = Deployment.getInstance(platform_id + "/" + deployment_id);
-			
-			Assignment a = new Assignment();
-			a.assignmentType = "Poll";
-			a.platform_deployment_id = d.platform_deployment_id;
-			
-				
+			APChemUnit u = ofy().load().type(APChemUnit.class).id(unitId).safe();
+			String title = assignmentType + " - " + u.title;
+			Assignment a = new Assignment(assignmentType,title,unitId,d.platform_deployment_id);
 			ofy().save().entity(a).now();
 			
-			String launchUrl = iss;
-			String iconUrl = iss + (iss.lastIndexOf("/")==iss.length()?"":"/") + "images/respondog.png";
+			String launchUrl = iss + "/lti";
+			String iconUrl = iss + (iss.lastIndexOf("/")==iss.length()?"":"/") + "images/chem4ap_atom.png";
 			String client_id = d.client_id;
 			String subject = claims.get("sub").getAsString();
 			String nonce = Nonce.generateNonce();
@@ -145,8 +202,7 @@ public class LTIRequest extends HttpServlet {
 			JsonObject item = new JsonObject();
 			item.addProperty("type", "ltiResourceLink");
 	
-			int maxScore = 5;
-			String title = "Class Poll";
+			int maxScore = 10;
 			item.addProperty("title", title);
 	
 			JsonObject lineitem = new JsonObject();
@@ -194,10 +250,10 @@ public class LTIRequest extends HttpServlet {
 			// Create a form to be auto-submitted to the platform by the user_agent browser
 			
 			buf.append(Util.banner
-					+ "<h2>A new poll is being created in your course.</h2>"
-					+ "When you launch the poll, you will be given an opportunity to create a set of "
-					+ "questions for your audience or select questions that you created previously "
-					+ "for other polls.<br/>Send questions or comments to admin@respondog.com<br/><br/>");
+					+ "<h2>A new assignment is being created in your course.</h2>"
+					+ "When you launch it, you will be given an opportunity to customize it by "
+					+ "selecting the question to be presented or changing the default settings.<br/>"
+					+ "Send questions or comments to admin@chemvantage.org<br/><br/>");
 			buf.append("<form id=selections method=POST action='" + deep_link_return_url + "'>"
 					+ "<input type=hidden name=JWT value='" + jwt + "' />"
 					+ "<input type=submit value='Continue' />"
@@ -336,11 +392,11 @@ public class LTIRequest extends HttpServlet {
 	
 			Deployment d = Deployment.getInstance(platformDeploymentId);
 	
-			if (d==null) throw new Exception("The deployment was not found in the ResponDog database. You "
-					+ "can register your LMS with us at https://respondog.com/registration");
+			if (d==null) throw new Exception("The deployment was not found in the Chem4AP database. You "
+					+ "can register your LMS with us at https://www.chem4ap.com/lti/registration");
 			if (d.expires != null && d.expires.before(new Date())) d.status = "blocked";
-			if ("blocked".equals(d.status)) throw new Exception("Sorry, we were unable to launch ResponDog from this "
-					+ "account. Please contact admin@respondog.com for assistance to reactivate the account. Thank you.");
+			if ("blocked".equals(d.status)) throw new Exception("Sorry, we were unable to launch Chem4AP from this "
+					+ "account. Please contact admin@chemvantage.org for assistance to reactivate the account. Thank you.");
 			if (d.status == null) d.status = "pending";
 	
 			// validate the id_token audience:
@@ -353,7 +409,7 @@ public class LTIRequest extends HttpServlet {
 			} else {  // aud is a String
 				if (aud.getAsString().equals(d.client_id)) return d;  // audience is OK)
 			}
-			throw new Exception("The id_token client_id claim is not authorized in ChemVantage.");
+			throw new Exception("The id_token client_id claim is not authorized in Chem4AP.");
 		} catch (Exception e) {
 			throw new Exception("ID token could not be validated: " + e.getMessage()==null?e.toString():e.getMessage());
 		}
@@ -361,7 +417,7 @@ public class LTIRequest extends HttpServlet {
 
 	private void validateStateToken(String iss,String state) throws Exception {
 		/* This method ensures that the state token required by LTI v1.3 standards is a
-		 * valid token issued by the tool provider (ChemVantage) as part of the LTI
+		 * valid token issued by the tool provider (Chem4AP) as part of the LTI
 		 * launch request sequence. Otherwise throws a JWTVerificationException.
 		 */
 

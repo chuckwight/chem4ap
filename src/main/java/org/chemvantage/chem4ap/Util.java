@@ -6,7 +6,10 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.text.DecimalFormat;
+import java.util.Date;
 
+import com.auth0.jwt.JWT;
+import com.auth0.jwt.algorithms.Algorithm;
 import com.google.cloud.ServiceOptions;
 import com.googlecode.objectify.annotation.Entity;
 import com.googlecode.objectify.annotation.Id;
@@ -21,26 +24,28 @@ import com.sendgrid.helpers.mail.objects.Email;
 
 @Entity
 public class Util {
-	@Id static Long id = 1L;
-	private static double avgStars = 0;
-	private static int nStarReports = 0;
-	private static String HMAC256Secret = "ChangeMe";
-	private static String reCaptchaSecret = "ChangeMe";
-	private static String reCaptchaSiteKey = "ChangeMe";
-	private static String salt = "ChangeMe";
-	private static String announcement = "ChangeMe";
-	private static String sendGridAPIKey = "ChangeMe";
+	@Id Long id = 1L;
+	private double avgStars = 0.0;
+	private int nStarReports = 0;
+	private String HMAC256Secret = "ChangeMe";
+	private String reCaptchaSecret = "ChangeMe";
+	private String reCaptchaSiteKey = "ChangeMe";
+	private String salt = "ChangeMe";
+	private String announcement = "ChangeMe";
+	private String sendGridAPIKey = "ChangeMe";
+	private String openAIKey = "ChangeMe";
+	private String gptModel = "ChangeMe";
 	
 	@Ignore static final String projectId = ServiceOptions.getDefaultProjectId();
 	
-	static Util u;
+	@Ignore static Util u;
 	
 	
 	private Util() {}
 	
-	static String banner = "<div style='font-size:2em;font-weight:bold;color:#000080;'><img src='/images/CVLogo_thumb.png' alt='ChemVantage Logo' style='vertical-align:middle;width:60px;'> Chem4AP</div>";
+	static String banner = "<div style='font-size:2em;font-weight:bold;color:#000080;'><img src='/images/chem4ap_atom.png' alt='Chem4AP Logo' style='vertical-align:middle;width:60px;'> Chem4AP</div>";
 
-	static void addStarReport(int stars) {
+	void addStarReport(int stars) {
 		avgStars = (avgStars*nStarReports + stars)/(nStarReports+1);
 		nStarReports++;
 		ofy().save().entity(u);
@@ -48,7 +53,7 @@ public class Util {
 
 	static double getAvgStars() {
 		DecimalFormat df2 = new DecimalFormat("#.#");
-		return Double.valueOf(df2.format(avgStars));
+		return Double.valueOf(df2.format(u.avgStars));
 	}
 	
 	static String hashId(String userId) {
@@ -87,45 +92,55 @@ public class Util {
 	static String foot() {
 		return  "<footer><p><hr style='width:600px;margin-left:0' />"
 				+ "<a style='text-decoration:none;color:#000080;font-weight:bold' href=/index.html>"
-				+ "sage</a> | "
+				+ "Chem4AP</a> | "
 				+ "<a href=/terms_and_conditions.html>Terms and Conditions of Use</a> | "
 				+ "<a href=/privacy_policy.html>Privacy Policy</a> | "
 				+ "<a href=/copyright.html>Copyright</a></footer>\n"
 				+ "</body></html>";
 	}
 
-	static String getHMAC256Secret() { 
+	static String getHMAC256Secret() throws Exception { 
 		refresh();
-		return HMAC256Secret; 
+		return u.HMAC256Secret; 
 	}
 
 	static String getReCaptchaSecret() {
 		refresh();
-		return reCaptchaSecret;
+		return u.reCaptchaSecret;
 	}
 
 	static String getReCaptchaSiteKey() {
 		refresh();
-		return reCaptchaSiteKey;
+		return u.reCaptchaSiteKey;
 	}
 
 	static String getSalt() { 
 		refresh();
-		return salt; 
+		return u.salt; 
 	}
 
 	static String getAnnouncement() { 
 		refresh();
-		return announcement; 
+		return u.announcement; 
 	}
 
 	static String getSendGridKey() {
 		refresh();
-		return sendGridAPIKey;
+		return u.sendGridAPIKey;
+	}
+	
+	static String getOpenAIKey() {
+		refresh();
+		return u.openAIKey;
+	}
+	
+	static String getGPTModel() {
+		refresh();
+		return u.gptModel;
 	}
 	
 	static String getServerUrl() {
-		if (projectId.equals("chem4ap")) return "www.chem4ap.com";
+		if (projectId.equals("chem4ap")) return "https://www.chem4ap.com";
 		else if (projectId.equals("dev-chem4ap")) return "https://dev-chem4ap.appspot.com";
 		return null;
 	}
@@ -135,10 +150,33 @@ public class Util {
 			if (u == null) u = ofy().load().type(Util.class).id(1L).safe();
 		} catch (Exception e) { // this will run only once when project is initiated
 			u = new Util();
-			ofy().save().entity(u);
+			ofy().save().entity(u).now();
 		}
 	}
 
+	protected static String getToken(String sig) {
+		StringBuffer debug = new StringBuffer("Debug: ");
+		try {
+			Date now = new Date();
+			Date in90Min = new Date(now.getTime() + 5400000L);
+			debug.append("1");
+			String secret = Util.getHMAC256Secret();
+			debug.append("a");
+			Algorithm algorithm = Algorithm.HMAC256(secret);
+			debug.append("2");
+			String token = JWT.create()
+					.withSubject(sig)
+					.withExpiresAt(in90Min)
+					.withJWTId(Nonce.generateNonce())
+					.sign(algorithm);
+			debug.append("3");
+			return token;
+		} catch (Exception e) {
+			return null;
+			//throw new Exception("Error: " + e.getMessage() + debug.toString());
+		}
+	}
+	
 	static void sendEmail(String recipientName, String recipientEmail, String subject, String message) 
 			throws IOException {
 		Email from = new Email("admin@chemvantage.org","ChemVantage LLC");
@@ -147,7 +185,7 @@ public class Util {
 		Content content = new Content("text/html", message);
 		Mail mail = new Mail(from, subject, to, content);
 
-		SendGrid sg = new SendGrid(sendGridAPIKey);
+		SendGrid sg = new SendGrid(u.sendGridAPIKey);
 		Request request = new Request();
 		request.setMethod(Method.POST);
 		request.setEndpoint("mail/send");
