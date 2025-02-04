@@ -105,6 +105,9 @@ static void addUnit(HttpServletRequest request) {
 				+    u.unitNumber + "." + nextTopicNumber + ".A.3 <textarea rows=5 cols=80 name=Knowledge></textarea><br/>"
 				+    u.unitNumber + "." + nextTopicNumber + ".A.4 <textarea rows=5 cols=80 name=Knowledge></textarea><br/>"
 				+    u.unitNumber + "." + nextTopicNumber + ".A.5 <textarea rows=5 cols=80 name=Knowledge></textarea><br/>"
+				+    u.unitNumber + "." + nextTopicNumber + ".A.6 <textarea rows=5 cols=80 name=Knowledge></textarea><br/>"
+				+    u.unitNumber + "." + nextTopicNumber + ".A.7 <textarea rows=5 cols=80 name=Knowledge></textarea><br/>"
+				+    u.unitNumber + "." + nextTopicNumber + ".A.8 <textarea rows=5 cols=80 name=Knowledge></textarea><br/>"
 				+ "  <input type=submit />"
 				+ "</form>");
 		
