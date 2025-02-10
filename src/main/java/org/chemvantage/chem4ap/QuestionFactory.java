@@ -11,6 +11,7 @@ import com.auth0.jwt.JWT;
 import com.auth0.jwt.algorithms.Algorithm;
 import com.auth0.jwt.interfaces.DecodedJWT;
 import com.auth0.jwt.interfaces.JWTVerifier;
+import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 
@@ -33,17 +34,46 @@ public class QuestionFactory extends HttpServlet {
 			question.addProperty("prompt", "What is the atomic number of Boron?");
 			question.addProperty("correctAnswer", 5);
 			question.addProperty("id",  '0');
+			question.addProperty("type", "numeric");
 			questions.add(question);
 			question = new JsonObject();
 			question.addProperty("prompt", "A ________ is an ordinary phase of matter that does not adopt the shape of its container.");
 			question.addProperty("correctAnswer", "solid");
 			question.addProperty("id",  '1');
+			question.addProperty("type", "fill_in_blank");
 			questions.add(question);
 			question = new JsonObject();
-			question.addProperty("prompt", "A student claims that the SI unit of mass is 1 g. True or false?");
-			question.addProperty("correctAnswer", false);
+			question.addProperty("prompt", "A student claims that the SI unit of mass is 1 g.");
+			question.addProperty("correctAnswer", "false");
 			question.addProperty("id",  '2');
-			questions.add(question);			
+			question.addProperty("type", "true_false");
+			questions.add(question);
+			question = new JsonObject();
+			question.addProperty("prompt", "Which of the following carries a positive electric charge?");
+			question.addProperty("correctAnswer", "b");
+			question.addProperty("id", '3');
+			question.addProperty("type", "multiple_choice");
+			JsonArray choices = new JsonArray();
+			choices.add("neutron");
+			choices.add("proton");
+			choices.add("electron");
+			choices.add("photon");
+			question.add("choices",choices);
+			questions.add(question);
+			question = new JsonObject();
+			question.addProperty("prompt", "Which of the following household items are acids?");
+			question.addProperty("correctAnswer", "ae");
+			question.addProperty("id", '4');
+			question.addProperty("type", "checkbox");
+			choices = new JsonArray();
+			choices.add("vinegar");
+			choices.add("ammonia");
+			choices.add("milk");
+			choices.add("bleach");
+			choices.add("lemon juice");
+			question.add("choices",choices);
+			questions.add(question);
+			
 		}
 	}
 
@@ -97,11 +127,28 @@ public class QuestionFactory extends HttpServlet {
 			String studentAnswer = requestJson.get("answer").getAsString();
 			
 			JsonObject question = questions.get(questionId);
+			question.addProperty("studentAnswer", studentAnswer);
 			StringBuffer buf = new StringBuffer();
-			if (question.get("correctAnswer").getAsString().equals(studentAnswer)) {
-				buf.append("<h2>Congratulations</h2>Your answer is correct.");
+			if (isCorrect(question)) {
+				buf.append("<h2>That's right! Your answer is correct.</h2>");
 			} else {
-				buf.append("<h2>Sorry, your answer is not correct</h2");
+				buf.append("<h2>Sorry, your answer is not correct</h2>The correct answer is: ");
+				String correctAnswer = question.get("correctAnswer").getAsString();
+				switch (question.get("type").getAsString()) {
+				case "multiple_choice":
+					correctAnswer = question.get("choices").getAsJsonArray().get(correctAnswer.charAt(0)-'a').getAsString();
+					break;
+				case "checkbox":
+					StringBuffer ans = new StringBuffer("<ul>");
+					for (int i=0; i<correctAnswer.length(); i++) {
+						ans.append("<li>" + question.get("choices").getAsJsonArray().get(correctAnswer.charAt(i)-'a').getAsString() + "</li>");
+					}
+					ans.append("</ul>");
+					correctAnswer = ans.toString();
+					break;
+				default: 
+				}
+				buf.append(correctAnswer);
 			}
 			
 			JsonObject responseJson = new JsonObject();
