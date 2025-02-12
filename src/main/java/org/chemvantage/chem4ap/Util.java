@@ -10,6 +10,8 @@ import java.util.Date;
 
 import com.auth0.jwt.JWT;
 import com.auth0.jwt.algorithms.Algorithm;
+import com.auth0.jwt.interfaces.DecodedJWT;
+import com.auth0.jwt.interfaces.JWTVerifier;
 import com.google.cloud.ServiceOptions;
 import com.googlecode.objectify.annotation.Entity;
 import com.googlecode.objectify.annotation.Id;
@@ -145,6 +147,17 @@ public class Util {
 		return null;
 	}
 	
+	static String isValid(String token) throws Exception {
+		Algorithm algorithm = Algorithm.HMAC256(Util.getHMAC256Secret());
+		JWTVerifier verifier = JWT.require(algorithm).build();
+		verifier.verify(token);
+		DecodedJWT payload = JWT.decode(token);
+		String nonce = payload.getId();
+		if (!Nonce.isUnique(nonce)) throw new Exception("Token was used previously.");
+		// return the user's tokenSignature
+		return payload.getSubject();
+	}
+
 	static void refresh() {
 		try {  // retrieve values from datastore when a new software version is installed
 			if (u == null) u = ofy().load().type(Util.class).id(1L).safe();
@@ -155,25 +168,18 @@ public class Util {
 	}
 
 	protected static String getToken(String sig) {
-		StringBuffer debug = new StringBuffer("Debug: ");
 		try {
 			Date now = new Date();
 			Date in90Min = new Date(now.getTime() + 5400000L);
-			debug.append("1");
-			String secret = Util.getHMAC256Secret();
-			debug.append("a");
-			Algorithm algorithm = Algorithm.HMAC256(secret);
-			debug.append("2");
+			Algorithm algorithm = Algorithm.HMAC256(Util.getHMAC256Secret());
 			String token = JWT.create()
 					.withSubject(sig)
 					.withExpiresAt(in90Min)
 					.withJWTId(Nonce.generateNonce())
 					.sign(algorithm);
-			debug.append("3");
 			return token;
 		} catch (Exception e) {
 			return null;
-			//throw new Exception("Error: " + e.getMessage() + debug.toString());
 		}
 	}
 	

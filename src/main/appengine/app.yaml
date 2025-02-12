@@ -10,10 +10,10 @@ handlers:
   secure: always
 
 # All requests to the following URLs are restricted to admins or service accounts
-#- url: /(admin|chapters|concepts|questions)
-#  secure: always
-#  login: admin
-#  script: auto
+- url: /questions
+  secure: always
+  login: admin
+  script: auto
 
 # All other requests must be secure (TLS)
 - url: /.*

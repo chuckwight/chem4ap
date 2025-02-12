@@ -47,136 +47,78 @@ import com.googlecode.objectify.annotation.Index;
 public class Question implements Serializable, Cloneable {
 	private static final long serialVersionUID = 137L;
 	@Id 	Long id;
-	@Index	long topicId;
-	@Index	Long conceptId; 
+	@Index	Long topicId; 
 	@Index	String assignmentType;
-	@Index	String text;
+	@Index	int pointValue=1;
+			String prompt;
 			String type;
-			int nChoices=0;
+			String correctAnswer;
+			String units;
 			List<String> choices = new ArrayList<String>();
 			double requiredPrecision=0;
 			int significantFigures = 0;
-			String correctAnswer;
-			String tag;
-	@Index	int pointValue=1;
 			String parameterString;
-			String hint;
-			String solution;
-	@Index	String authorId;
-			String contributorId;
-			String editorId;
-			String notes;
-			String learn_more_url;
-			String sageAdvice;
-			String explanation;
 			boolean scrambleChoices;
-			boolean strictSpelling;
-	private Integer nCorrectAnswers = null;
-	private Integer nTotalAttempts = null;
-			// Note: the parameters array formerly had the attribute @Transient javax.persistence.Transient
-	@Ignore		int[] parameters = {0,0,0,0};
-	@Index		boolean isActive = false;
+			Integer nCorrectAnswers = null;
+			Integer nTotalAttempts = null;
+	@Ignore	int[] parameters = {0,0,0,0};
 	
-	public static final int MULTIPLE_CHOICE = 1;
-	public static final int TRUE_FALSE = 2;
-	public static final int SELECT_MULTIPLE = 3;
-	public static final int FILL_IN_WORD = 4;
-	public static final int NUMERIC = 5;
-	public static final int FIVE_STAR = 6;
-	public static final int ESSAY = 7;
-
 	Question() {}
 
-	Question(int t) {
-		switch (t) {
-		case (1): this.type = "MULTIPLE_CHOICE"; break;
-		case (2): this.type = "TRUE_FALSE"; break;
-		case (3): this.type = "SELECT_MULTIPLE"; break;
-		case (4): this.type = "FILL_IN_WORD"; break;
-		case (5): this.type = "NUMERIC";
-				  this.significantFigures = 3;
-				  this.requiredPrecision = 2; // percent
-				  break;
-		case (6): this.type = "FIVE_STAR"; break;
-		case (7): this.type = "ESSAY"; break;
-		default:  this.type = null;
-		}
+	Question(String type) {
+		this.type = type;
 		this.correctAnswer = "";
 		this.parameterString = "";
 		this.pointValue = 1;
-		this.isActive = false;
 	}
 
-	Question (long conceptId,String text,String type,int nChoices,List<String> choices,
-			double requiredPrecision,int significantFigures,String correctAnswer,String tag,int pointValue,String parameterString,
+	Question (long topicId,String prompt,String type,List<String> choices,
+			double requiredPrecision,int significantFigures,String correctAnswer,String units,int pointValue,String parameterString,
 			String hint,String solution,String authorId,String contributorId,String editorId,String notes) {
-		this.conceptId = conceptId;
-		this.text = text;
+		this.topicId = topicId;
+		this.prompt = prompt;
 		this.type = type;
-		this.nChoices = nChoices;
 		this.choices = choices;
 		this.requiredPrecision = requiredPrecision;
 		this.significantFigures = significantFigures;
 		this.correctAnswer = correctAnswer;
-		this.tag = tag;
+		this.units = units;
 		this.pointValue = pointValue;
 		this.parameterString = parameterString;
-		this.hint = hint;
-		this.solution = solution;
-		this.authorId = authorId;
-		this.contributorId = contributorId;
-		this.editorId = editorId;
-		this.notes = "";
-		this.isActive = false;
 	}
 
-	public void validateFields() {
-		if (assignmentType==null) assignmentType="";
-		if (text==null) text="";
-		if (type==null) type="";
-		if (correctAnswer==null) correctAnswer="";
-		if (tag==null) tag="";
-		if (parameterString==null) parameterString="";
-		if (hint==null) hint="";
-		if (solution==null) solution="";
-		if (authorId==null) authorId="";
-		if (contributorId==null) contributorId="";
-		if (editorId==null) editorId="";
-		if (notes==null) notes="";
-	}
-	public Long getId() {
-		return this.id;
-	}
-	
-	public int getPointValue() {
-		return this.pointValue;
-	}
-	
 	public String getCorrectAnswer() {
-		switch (getQuestionType()) {
-		case 4: // FILL-IN-WORD
+		switch (type) {
+		case "multiple_choice":
+			return choices.get(correctAnswer.charAt(0)-'a');
+		case "true_false":
+			return correctAnswer;
+		case "checkbox":
+			StringBuffer buf = new StringBuffer("<ul>");
+			for (int i=0; i<correctAnswer.length(); i++) {
+				buf.append("<li>" + choices.get(correctAnswer.charAt(i)-'a') + "</li>");
+			}
+			buf.append("</ul>");
+			return buf.toString();
+		case "fill_in_blank":
 			String[] answers = correctAnswer.split(",");
 			return answers[0];
-		case 5: // NUMERIC
+		case "numeric":
 			return parseString(correctAnswer);
-		default: return correctAnswer;
+		default: return correctAnswer + units==null?"":" " + units;
 		}
 	}
 	
 	public boolean requiresParser() {
-		return text.contains("#") || this.parameterString != null && !this.parameterString.isEmpty();
+		return prompt.contains("#") || this.parameterString != null && !this.parameterString.isEmpty();
 	}
 	
 	public void setParameters() {
-		if (this.requiresParser()) setParameters(-1); // set parameters with a random seed based on the current time
+		if (this.requiresParser()) setParameters(-1L); // set parameters with a random seed
 	}
 
 	public void setParameters(long seed) {
 		if (!this.requiresParser()) return;     // bulletproofing
-		if (this.parameterString==null || this.parameterString.isEmpty()) {
-			this.parameterString = "";
-			return;
-		}
 
 		Random rand = new Random();
 		// use seed=-1 for randomly fluctuating parameters, non-zero for deterministic pseudo-random
@@ -288,10 +230,10 @@ public class Question implements Serializable, Cloneable {
 		char choice = 'a';
 		List<Character> choice_keys = new ArrayList<Character>();
 		Random rand = new Random();
-		switch (getQuestionType()) {
-		case 1: // Multiple Choice
-			buf.append(text + "<br/>");
-			for (int i=0; i<nChoices; i++) choice_keys.add(Character.valueOf((char)('a'+i)));
+		switch (type) {
+		case "multiple_choice":
+			buf.append(prompt + "<br/>");
+			for (int i=0; i<choices.size(); i++) choice_keys.add(Character.valueOf((char)('a'+i)));
 			buf.append("<span style='color:#EE0000;font-size: small;'>Select only the best answer:</span><br/>");
 			while (choice_keys.size()>0) {
 				choice = choice_keys.remove(scrambleChoices?rand.nextInt(choice_keys.size()):0);
@@ -299,17 +241,17 @@ public class Question implements Serializable, Cloneable {
 			}
 			if (!placeholder.isEmpty()) buf.append("<span style='color: gray; font-size: 0.8em;'>" + placeholder + "</span><br/>");
 			break;
-		case 2: // True/False
-			buf.append(text);
+		case "true_false":
+			buf.append(prompt);
 			buf.append("<br/>");
 			buf.append("<span style='color:#EE0000;font-size: small;'>Select true or false:</span><br/>");
 			buf.append("<label><input type=radio name=" + this.id + " value='true'" + (studentAnswer.equals("true")?" CHECKED />":" />") + " True</label><br/>");
 			buf.append("<label><input type=radio name=" + this.id + " value='false'" + (studentAnswer.equals("false")?" CHECKED />":" />") + " False</label><br/>");
 			if (!placeholder.isEmpty()) buf.append("<span style='color: gray; font-size: 0.8em;'>" + placeholder + "</span><br/>");
 			break;
-		case 3: // Select Multiple
-			buf.append(text + "<br/>");
-			for (int i=0; i<nChoices; i++) choice_keys.add(Character.valueOf((char)('a'+i)));
+		case "checkbox":
+			buf.append(prompt + "<br/>");
+			for (int i=0; i<choices.size(); i++) choice_keys.add(Character.valueOf((char)('a'+i)));
 			buf.append("<span style='color:#EE0000;font-size: small;'>Select all of the correct answers:</span><br/>");
 			while (choice_keys.size()>0) {
 				choice = choice_keys.remove(scrambleChoices?rand.nextInt(choice_keys.size()):0);
@@ -317,15 +259,15 @@ public class Question implements Serializable, Cloneable {
 			}
 			if (!placeholder.isEmpty()) buf.append("<span style='color: gray; font-size: 0.8em;'>" + placeholder + "</span><br/>");
 			break;
-		case 4: // Fill-in-the-Word
-			buf.append("<label for=" + this.id + ">" + text + "</label>");
+		case "fill_in_blank": 
+			buf.append("<label for=" + this.id + ">" + prompt + "</label>");
 			buf.append("<br/>");
 			buf.append("<span style='color:#EE0000;font-size: small;'>Enter the correct word or phrase:</span><br/>");
 			buf.append("<input id=" + this.id + " type=text aria-label='student answer' name=" + this.id + " value='" + quot2html(studentAnswer) + "' placeholder='" + placeholder + "' />");
-			buf.append("&nbsp;" + tag + "<br/><br/>");
+			buf.append("&nbsp;" + units + "<br/><br/>");
 			break;
-		case 5: // Numeric Answer
-			buf.append(parseString(text));
+		case "numeric":
+			buf.append(parseString(prompt));
 			buf.append("<br/>");
 			buf.append("<div id=showWork" + this.id + " style='display:none'>"
 					+ "<label>Show your work:<br/><TEXTAREA NAME=ShowWork" + this.id + " ROWS=5 COLS=50 WRAP=SOFT "
@@ -340,37 +282,10 @@ public class Question implements Serializable, Cloneable {
 			default:
 			}
 			buf.append("<label><input aria-label='student answer' size=25 type=text name=" + this.id + " id=answer" + this.id + " value='" + studentAnswer + "' placeholder='" + placeholder + "' onFocus=showWorkBox('" + this.id + "'); />");
-			buf.append("&nbsp;" + parseString(tag) + "</label><br/><br/>");
+			buf.append("&nbsp;" + parseString(units) + "</label><br/><br/>");
 			break;        
-		case 6: // FIVE_STAR rating
-			buf.append(text);
-			buf.append("<br/>");
-			buf.append("<span id='vote" + this.id + "' style='color:#990000;font-size:small;'>(click a star):</span><br/>");
-			for (int i=1;i<6;i++) {
-				buf.append("<img src='images/star1.gif' id='star" + i + String.valueOf(this.id) + "' style='width:30px; height:30px;' alt='star " + i + " for rating' "        // properties
-						+ "onmouseover=showStars" + this.id + "(" + i + ") onmouseout=showStars" + this.id + "(0) onclick=showStars" + this.id + "(" + i + ",true) />" ); // mouse actions
-			}
-			buf.append("<input id=" + this.id + " type=hidden name=" + this.id + " />");
-			buf.append("&nbsp;&nbsp;&nbsp;&nbsp;<input type=range min=1 max=5 style='opacity:0' onfocus=this.style='opacity:1' oninput='showStars" + this.id + "(this.value,true);' />");
-			buf.append("<br clear='all'>");
-			buf.append("<script>"
-					+ "var fixed" + this.id + " = false;"
-					+ "function showStars" + this.id + "(nStars,clicked=false) {"
-					+ "  if (fixed" + this.id + " && !clicked) return;"
-					+ "  document.getElementById('vote" + this.id + "').innerHTML=(nStars==0?'(click a star)':nStars+(nStars>1?' stars':' star'));"  // unary operator + converts string to int
-					+ "  for (i=1;i<6;i++) document.getElementById('star'+i+'" + this.id + "').src = (nStars<i?'images/star1.gif':'images/star2.gif');"
-					+ "  fixed" + this.id + " = clicked;"
-					+ "  if (clicked) document.getElementById('" + this.id + "').value=nStars;"
-					+ "}"
-					+ "</script>\n");
-			int initialStars = 0;
-			try { 
-				initialStars = Integer.parseInt(studentAnswer);
-				buf.append("<script>showStars" + this.id + "(" + initialStars + ",true);</script>");
-			} catch (Exception e) {}
-			break;
-		case 7: // Short ESSAY question
-			buf.append(text);
+		case "essay":
+			buf.append(prompt);
 			buf.append("<br/>");
 			buf.append("<span style='color:#990000;font-size:small;'>(800 characters max):</span><br/>");
 			buf.append("<textarea id=" + this.id + " aria-label='enter your essay here' name=" + this.id 
@@ -380,20 +295,16 @@ public class Question implements Serializable, Cloneable {
 		return buf.toString();
 	}
 
-	String getHint() {
-		return parseString(hint) + "<br/>";
-	}
-	
 	String printAll() {
 		// use this method to display an example of the question, correct answer and solution
 		StringBuffer buf = new StringBuffer();
 		char choice = 'a';
 		List<Character> choice_keys = new ArrayList<Character>();
-		for (int i=0; i<nChoices; i++) choice_keys.add(Character.valueOf((char)('a'+i)));
+		for (int i=0; i<choices.size(); i++) choice_keys.add(Character.valueOf((char)('a'+i)));
 		Random rand = new Random();
-		switch (getQuestionType()) {
-		case 1: // Multiple Choice
-			buf.append(text + "<br/>");
+		switch (type) {
+		case "multiple_choice": // Multiple Choice
+			buf.append(prompt + "<br/>");
 			buf.append("<span style='color:#EE0000;font-size: small;'>Select only the best answer:</span><br/>");
 			buf.append("<UL" + (scrambleChoices?" style=color:red":"") + ">");
 			while (choice_keys.size()>0) {
@@ -406,8 +317,8 @@ public class Question implements Serializable, Cloneable {
 			}
 			buf.append("</UL>");
 			break;
-		case 2: // True/False
-			buf.append(text + "<br/>");
+		case "true_false":
+			buf.append(prompt + "<br/>");
 			buf.append("<span style='color:#EE0000;font-size: small;'>Select true or false:</span><UL>");
 			buf.append("<LI>" 
 					+ (correctAnswer.equals("true")?"<B>True</B>":"<FONT COLOR=#888888>True</FONT>") 
@@ -417,8 +328,8 @@ public class Question implements Serializable, Cloneable {
 					+ "</LI>");
 			buf.append("</UL>");
 			break;
-		case 3: // Select Multiple
-			buf.append(text + "<br/>");
+		case "checkbox": 
+			buf.append(prompt + "<br/>");
 			buf.append("<span style='color:#EE0000;font-size: small;'>Select all of the correct answers:</span>");
 			buf.append("<UL" + (scrambleChoices?" style=color:red":"") + ">");
 			while (choice_keys.size()>0) {
@@ -431,17 +342,15 @@ public class Question implements Serializable, Cloneable {
 			}
 			buf.append("</UL>");
 			break;
-		case 4: // Fill-in-the-Word
-			buf.append(text + "<br/>");
+		case "fill_in_blank":
+			buf.append(prompt + "<br/>");
 			buf.append("<span style='color:#EE0000;font-size: small;'>Enter the correct word or phrase:</span><br/>");
 			buf.append("<span style='border: 1px solid black'>"
 					+ "<b>" + (this.hasACorrectAnswer()?quot2html(correctAnswer):"&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;") + "</b>"
-					+ "</span>");
-			buf.append("&nbsp;" + tag + "<br/>"
-					+ (this.hasACorrectAnswer() && this.strictSpelling?"Spelling: strict<br/><br/>":"<br/>"));
+					+ "</span><br/><br/>");
 			break;
-		case 5: // Numeric Answer
-			buf.append(parseString(text) + "<br/>");
+		case "numeric":
+			buf.append(parseString(prompt) + "<br/>");
 			switch (getNumericItemType()) {
 			case 0: buf.append("<span style='color:#EE0000;font-size: small;'>Enter the exact value. <a role='button' href=# onclick=\"alert('Your answer must have exactly the correct value. You may use scientific E notation. Example: enter 3.56E-12 to represent the number 3.56\u00D710\u207B\u00B9\u00B2');return false;\">&#9432;</a></span><br/>"); break;
 			case 1: buf.append("<span style='color:#EE0000;font-size: small;'>Enter the value with the appropriate number of significant figures. <a role='button' href=# onclick=\"alert('Use the information in the problem to determine the correct number of sig figs in your answer. You may use scientific E notation. Example: enter 3.56E-12 to represent the number 3.56\u00D710\u207B\u00B9\u00B2');return false;\">&#9432;</a></span><br/>"); break;
@@ -453,37 +362,10 @@ public class Question implements Serializable, Cloneable {
 			buf.append("<span style='border: 1px solid black'>"
 					+ "<b>" + (this.hasACorrectAnswer()?getCorrectAnswer():"&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;") + "</b>"
 					+ "</span>");
-			buf.append("&nbsp;" + parseString(tag) + "<br/><br/>");
-			if (hint != null && hint.length()>0) {
-				buf.append("Hint: " + parseString(hint) + "<br/><br/>");
-			}
-			if (solution != null && solution.length()>0) {
-				buf.append("Solution:<br/>" + parseString(solution) + "<br/><br/>");
-			}
+			buf.append("&nbsp;" + parseString(units) + "<br/><br/>");
 			break;        
-		case 6: // FIVE_STAR rating
-			buf.append(text);
-			buf.append("<br/>");
-			buf.append("<span id='vote" + this.id + "' style='color:#990000;font-size:small;'>(click a star):</span><br/>");
-			for (int i=1;i<6;i++) {
-				buf.append("<img src='images/star1.gif' id='star" + i + String.valueOf(this.id) + "' style='width:30px; height:30px;' alt='star' "        // properties
-						+ "onmouseover=showStars" + this.id + "(" + i + ") onmouseout=showStars" + this.id + "(0) onclick=showStars" + this.id + "(" + i + ",true) />" ); // mouse actions
-			}
-			buf.append("<input id=" + this.id + " type=hidden name=" + this.id + " />");
-			buf.append("<br/><br/>");
-			buf.append("<script>"
-					+ "var fixed" + this.id + " = false;"
-					+ "function showStars" + this.id + "(nStars,clicked=false) {"
-					+ "  if (fixed" + this.id + " && !clicked) return;"
-					+ "  document.getElementById('vote" + this.id + "').innerHTML=(nStars==0?'(click a star)':nStars+(nStars>1?' stars':' star'));"  // unary operator + converts string to int
-					+ "  for (i=1;i<6;i++) document.getElementById('star'+i+'" + this.id + "').src = (nStars<i?'images/star1.gif':'images/star2.gif');"
-					+ "  fixed" + this.id + " = clicked;"
-					//+ "  if (clicked) document.getElementById('" + this.id + "').value=nStars;"
-					+ "}"
-					+ "</script>\n");
-			break;
-		case 7: // Short ESSAY question
-			buf.append(text);
+		case "essay":
+			buf.append(prompt);
 			buf.append("<br/>");
 			buf.append("<span style='color:#990000;font-size:small;'>(800 characters max):</span><br/>");
 			buf.append("<textarea id=" + this.id + " name=" + this.id + " rows=5 cols=60 wrap=soft placeholder='Enter your answer here' "				
@@ -513,11 +395,11 @@ public class Question implements Serializable, Cloneable {
 		// showDetails enables display of Solution to numeric problems (default = true)
 		StringBuffer buf = new StringBuffer("<a name=" + this.id + "></a>");
 		char choice = 'a';
-		switch (getQuestionType()) {
-		case 1: // Multiple Choice
-			buf.append(text + "<br/>");
+		switch (type) {
+		case "multiple_choice": // Multiple Choice
+			buf.append(prompt + "<br/>");
 			buf.append("<span style='color:#EE0000;font-size: small;'>Select only the best answer:</span><br/>");
-			for (int i = 0; i < nChoices; i++) {
+			for (int i = 0; i < choices.size(); i++) {
 				buf.append("&nbsp;" + choice + ". "
 						+ (showDetails && correctAnswer.indexOf(choice)>=0?"<B>":"<FONT COLOR=#888888>")
 						+ quot2html(choices.get(i))
@@ -525,8 +407,8 @@ public class Question implements Serializable, Cloneable {
 				choice++;
 			}
 			break;
-		case 2: // True/False
-			buf.append(text + "<br/>");
+		case "true_false":
+			buf.append(prompt + "<br/>");
 			buf.append("<span style='color:#EE0000;font-size: small;'>Select true or false:</span><UL>");
 			buf.append("<LI>" 
 					+ (showDetails && correctAnswer.equals("true")?"<B>True</B>":"<FONT COLOR=#888888>True</FONT>") 
@@ -536,10 +418,10 @@ public class Question implements Serializable, Cloneable {
 					+ "</LI>");
 			buf.append("</UL>");
 			break;
-		case 3: // Select Multiple
-			buf.append(text + "<br/>");
+		case "checkbox": 
+			buf.append(prompt + "<br/>");
 			buf.append("<span style='color:#EE0000;font-size: small;'>Select all of the correct answers:</span><br/>");
-			for (int i = 0; i < nChoices; i++) {
+			for (int i = 0; i < choices.size(); i++) {
 				buf.append("&nbsp;" + choice + ". "
 						+ (showDetails && correctAnswer.indexOf(choice)>=0?"<B>":"<FONT COLOR=#888888>")
 						+ quot2html(choices.get(i))
@@ -547,17 +429,17 @@ public class Question implements Serializable, Cloneable {
 				choice++;
 			}
 			break;
-		case 4: // Fill-in-the-Word
-			buf.append(text + "<br/>");
+		case "fill_in_blank": 
+			buf.append(prompt + "<br/>");
 			buf.append("<span style='color:#EE0000;font-size: small;'>Enter the correct word or phrase:</span><br/>");
 			String[] answers = correctAnswer.split(",");
 			buf.append("<span style='border: 1px solid black'>"
 					+ (showDetails?"<b>" + quot2html(answers[0]) + "</b>":"&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;")
 					+ "</span>");
-			if (tag.length() > 0) buf.append("&nbsp;" + tag + "<br/>");
+			if (units.length() > 0) buf.append("&nbsp;" + units + "<br/>");
 			break;
-		case 5: // Numeric Answer
-			buf.append(parseString(text) + "<br/>");
+		case "numeric":
+			buf.append(parseString(prompt) + "<br/>");
 			switch (getNumericItemType()) {
 			case 0: buf.append("<span style='color:#EE0000;font-size: small;'>Enter the exact value. <a role='button' href=# onclick=\"alert('Your answer must have exactly the correct value. You may use scientific E notation. Example: enter 3.56E-12 to represent the number 3.56\u00D710\u207B\u00B9\u00B2');return false;\">&#9432;</a></span><br/>"); break;
 			case 1: buf.append("<span style='color:#EE0000;font-size: small;'>Enter the value with the appropriate number of significant figures. <a role='button' href=# onclick=\"alert('Use the information in the problem to determine the correct number of sig figs in your answer. You may use scientific E notation. Example: enter 3.56E-12 to represent the number 3.56\u00D710\u207B\u00B9\u00B2');return false;\">&#9432;</a></span><br/>"); break;
@@ -569,38 +451,26 @@ public class Question implements Serializable, Cloneable {
 			buf.append("<span style='border: 1px solid black'>"
 					+ (showDetails?"<b>" + getCorrectAnswer() + "</b>":"&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;")
 					+ "</span>");
-			buf.append("&nbsp;" + parseString(tag) + "<br/>");
+			buf.append("&nbsp;" + parseString(units) + "<br/>");
 			break;        
-		case 6:
-			buf.append(parseString(text) + "<br/>");
-			int nStars = 0;
-			try {
-				nStars = Integer.parseInt(studentAnswer);
-			} catch (Exception e) {}
-			for (int i=1;i<6;i++) {
-				buf.append("<img " + (i<=nStars?"src='images/star2.gif'":"src='images/star1.gif'") + " style='width:30px; height:30px;' alt='star' />");
-			}
-			buf.append("<br/>");
-			break;
-		case 7:
-			buf.append(text);
+		case "essay":
+			buf.append(prompt);
 			buf.append("<br/>");
 			buf.append("<span style='color:#990000;font-size:small;'>(800 characters max):</span><br/>");
 			break;
 		}
 		
 		buf.append("<br/>");
-		if (showWork != null && !showWork.isEmpty()) buf.append("<b>Student work:</b><br/><div style='border-style: solid; border-width: thin; white-space: pre-wrap;'>" + showWork + "</div>");	
 		if (studentAnswer==null || studentAnswer.isEmpty()) buf.append("<b>No answer was submitted for this question item.</b><p></p>");
-		else if (getQuestionType()<6) {
+		if (type.equals("essay")) {
+			buf.append("<b>The answer submitted was: </b><br/>" + studentAnswer + "<br/>");
+		} else {
 			buf.append("<b>The answer submitted was: " + studentAnswer + "</b>&nbsp;");
 			if (this.isCorrect(studentAnswer)) buf.append("&nbsp;<IMG SRC=/images/checkmark.gif ALT='Check mark' align=bottom>");
 			else if (this.agreesToRequiredPrecision(studentAnswer)) buf.append("<IMG SRC=/images/partCredit.png ALT='minus 1 sig figs' align=middle>"
 					+ "<br/>Your answer must have exactly " + significantFigures + " significant digits.<br/>If your answer ends in a zero, then it must also have a decimal point to indicate which digits are significant.");
 			else buf.append("<IMG SRC=/images/xmark.png ALT='X mark' align=middle>");
 			buf.append("<br/><br/>");
-		} else if (getQuestionType()==7) {
-			buf.append("<b>The answer submitted was: </b><br/>" + studentAnswer + "<br/>");
 		}
 		
 		if (reportable) {
@@ -614,12 +484,12 @@ public class Question implements Serializable, Cloneable {
 					+ "<div id='form" + this.id + "' style='display: none'>");
 
 			buf.append("<span style=color:red><br/>");
-			switch (getQuestionType()) {
-			case 1: buf.append("Reminder: The correct answer is shown in bold print above."); break; // MULTIPLE_CHOICE
-			case 2: buf.append("Reminder: The correct answer is shown in bold print above."); break; // TRUE_FALSE
-			case 3: buf.append("Reminder: The correct answers are shown in bold print above. You must select all of them."); break; // SELECT_MULTIPLE
-			case 4: buf.append("Reminder: The correct answer will always form a complete, grammatically correct sentence."); break; // FILL_IN_WORD
-			case 5: // NUMERIC
+			switch (type) {
+			case "multiple_choice": buf.append("Reminder: The correct answer is shown in bold print above."); break; // MULTIPLE_CHOICE
+			case "true_false": buf.append("Reminder: The correct answer is shown in bold print above."); break; // TRUE_FALSE
+			case "checkbox": buf.append("Reminder: The correct answers are shown in bold print above. You must select all of them."); break; // SELECT_MULTIPLE
+			case "fill_in_blank": buf.append("Reminder: The correct answer will always form a complete, grammatically correct sentence."); break; // FILL_IN_WORD
+			case "numeric":
 				switch (getNumericItemType()) {
 				case 0: buf.append("Reminder: Your answer must have exactly the same value as the correct answer."); break;
 				case 1: buf.append("Reminder: Your answer must have exactly the same value as the correct answer and must have " + significantFigures + " significant figures."); break;
@@ -642,9 +512,7 @@ public class Question implements Serializable, Cloneable {
 	}
 
 	String getExplanation() {
-		// if an explanation was stored previously 
-		if (!this.requiresParser() && this.explanation != null && !this.explanation.isEmpty()) return this.explanation;
-		// Otherwise, compute an explanation
+		// Compute an explanation
 		StringBuffer buf = new StringBuffer();
 		StringBuffer debug = new StringBuffer("Debug: ");
 		try {
@@ -659,8 +527,9 @@ public class Question implements Serializable, Cloneable {
 			m1.addProperty("content","You are a tutor assisting a college student taking General Chemistry. "
 					+ "Explain why\n" + this.getCorrectAnswerForSage() + "\n"
 					+ "is the correct answer to the following question item:\n"
+			/*  Fix the prompt when this method is activated
 					+ this.printForSage() + "\n"
-					+ "Format your response in HTML with LaTeX.");
+			*/		+ "Format your response in HTML with LaTeX.");
 			messages.add(m1);
 			api_request.add("messages", messages);
 			URL u = new URL("https://api.openai.com/v1/chat/completions");
@@ -680,172 +549,16 @@ public class Question implements Serializable, Cloneable {
 			JsonObject api_response = JsonParser.parseReader(reader).getAsJsonObject();
 			reader.close();
 			
-			this.explanation = api_response.get("choices").getAsJsonArray().get(0).getAsJsonObject().get("message").getAsJsonObject().get("content").getAsString();
+			String explanation = api_response.get("choices").getAsJsonArray().get(0).getAsJsonObject().get("message").getAsJsonObject().get("content").getAsString();
 			debug.append("e");
 			
-			if (!this.requiresParser()) ofy().save().entity(this);
-			buf.append(this.explanation);
+			buf.append(explanation);
 		} catch (Exception e) {
 			buf.append("<br/>Sorry, an explanation is not available at this time. " + (e.getMessage()==null?e.toString():e.toString()));  // + "<p>" + debug.toString()) + "<p>");
 		}
 		return buf.toString();
 	}
 
-
-	/*
-	String getExplanation() {
-		// if an explanation was stored previously 
-		if (!this.requiresParser() && this.explanation != null && !explanation.isEmpty()) return explanation;
-		// Otherwise, compute an explanation
-		StringBuffer buf = new StringBuffer();
-		try {
-			BufferedReader reader = null;
-			JsonObject api_request = new JsonObject();  // these are used to score essay questions using ChatGPT
-			api_request.addProperty("model",Subject.getGPTModel());
-			//api_request.addProperty("max_tokens",600);
-			api_request.addProperty("temperature",0.4);
-
-			JsonArray messages = new JsonArray();
-			JsonObject m1 = new JsonObject();  // api request message
-			m1.addProperty("role", "system");
-			m1.addProperty("content","You are a tutor assisting a college student taking General Chemistry. "
-					+ "Explain why\n" + getCorrectAnswerForSage() + "\n"
-					+ "is the correct answer to the following question item:\n"
-					+ printForSage() + "\n"
-					+ "Format your response in HTML ans use LaTeX for math.");
-			messages.add(m1);
-			api_request.add("messages", messages);
-			URL u = new URL("https://api.openai.com/v1/chat/completions");
-			HttpURLConnection uc = (HttpURLConnection) u.openConnection();
-			uc.setRequestMethod("POST");
-			uc.setDoInput(true);
-			uc.setDoOutput(true);
-			uc.setRequestProperty("Authorization", "Bearer " + Subject.getOpenAIKey());
-			uc.setRequestProperty("Content-Type", "application/json");
-			uc.setRequestProperty("Accept", "application/json");
-			OutputStream os = uc.getOutputStream();
-			byte[] json_bytes = api_request.toString().getBytes("utf-8");
-			os.write(json_bytes, 0, json_bytes.length);           
-			os.close();
-
-			reader = new BufferedReader(new InputStreamReader(uc.getInputStream()));
-			JsonObject api_response = JsonParser.parseReader(reader).getAsJsonObject();
-			reader.close();
-			this.explanation = api_response.get("choices").getAsJsonArray().get(0).getAsJsonObject().get("message").getAsJsonObject().get("content").getAsString();
-
-			if (!this.requiresParser()) ofy().save().entity(this);
-			buf.append(explanation);
-		} catch (Exception e) {
-			buf.append("<br/>Sorry, Sage was unable to elaborate. " + (e.getMessage()==null?e.toString():e.toString() + ":" + e.getMessage()) + "<p>");
-		}
-		return buf.toString();
-	}
-
-
-	/*
-	String getExplanation() {
-		// Get the AI to compute an explanation
-		StringBuffer buf = new StringBuffer();
-		try {
-			BufferedReader reader = null;
-			JsonObject api_request = new JsonObject();  // these are used to score essay questions using ChatGPT
-			api_request.addProperty("model",Subject.getGPTModel());
-			api_request.addProperty("max_tokens",600);
-			api_request.addProperty("temperature",0.4);
-
-			JsonArray messages = new JsonArray();
-			JsonObject m1 = new JsonObject();  // api request message
-			m1.addProperty("role", "system");
-			m1.addProperty("content","You are a tutor assisting a college student taking General Chemistry."
-					+ "Briefly explain why\n" + getCorrectAnswerForSage() + "\n"
-					+ "is the correct answer to this problem:\n" + printForSage() + "\n"
-					+ "Format the response in HTML and use LaTex math mode specific delimiters as follows:\n"
-					+ "inline math mode : `\\(` and `\\)`\n"
-					+ "display math mode: `\\[` and `\\]`\n"
-					+ "");
-			messages.add(m1);
-			api_request.add("messages", messages);
-			URL u = new URL("https://api.openai.com/v1/chat/completions");
-			HttpURLConnection uc = (HttpURLConnection) u.openConnection();
-			uc.setRequestMethod("POST");
-			uc.setDoInput(true);
-			uc.setDoOutput(true);
-			uc.setRequestProperty("Authorization", "Bearer " + Subject.getOpenAIKey());
-			uc.setRequestProperty("Content-Type", "application/json");
-			uc.setRequestProperty("Accept", "application/json");
-			OutputStream os = uc.getOutputStream();
-			byte[] json_bytes = api_request.toString().getBytes("utf-8");
-			os.write(json_bytes, 0, json_bytes.length);           
-			os.close();
-
-			reader = new BufferedReader(new InputStreamReader(uc.getInputStream()));
-			JsonObject api_response = JsonParser.parseReader(reader).getAsJsonObject();
-			reader.close();
-			buf.append(api_response.get("choices").getAsJsonArray().get(0).getAsJsonObject().get("message").getAsJsonObject().get("content").getAsString());
-		} catch (Exception e) {
-			buf.append("<br/>Sorry, Sage was unable to elaborate. " + (e.getMessage()==null?e.toString():e.toString() + ":" + e.getMessage()) + "<p>");
-		}
-		return buf.toString();
-	}
-*/
-	String printForSage() {
-		StringBuffer buf = new StringBuffer();
-		char choice = 'a';
-		List<Character> choice_keys = new ArrayList<Character>();
-		Random rand = new Random();
-		switch (getQuestionType()) {
-		case 1: // Multiple Choice
-			buf.append(text + "\n");
-			for (int i=0; i<nChoices; i++) choice_keys.add(Character.valueOf((char)('a'+i)));
-			buf.append("Select only the best answer:\n");
-			while (choice_keys.size()>0) {
-				choice = choice_keys.remove(scrambleChoices?rand.nextInt(choice_keys.size()):0);
-				buf.append(choices.get(choice-'a') + "\n");
-			}
-			break;
-		case 2: // True/False
-			buf.append(text + "\n");
-			buf.append("Select true or false:\n");
-			buf.append("True\n");
-			buf.append("False\n");
-			break;
-		case 3: // Select Multiple
-			buf.append(text + "\n");
-			for (int i=0; i<nChoices; i++) choice_keys.add(Character.valueOf((char)('a'+i)));
-			buf.append("Select all of the correct answers:\n");
-			while (choice_keys.size()>0) {
-				choice = choice_keys.remove(scrambleChoices?rand.nextInt(choice_keys.size()):0);
-				buf.append(choices.get(choice-'a') + "\n");
-			}
-			break;
-		case 4: // Fill-in-the-Word
-			buf.append("Fill in the blank with the correct word or phrase:\n" 
-					+ text + "_______________" + tag + "\n");
-			break;
-		case 5: // Numeric Answer
-			buf.append(parseString(text) + "\n");
-			switch (getNumericItemType()) {
-			case 0: buf.append("Enter the exact value: "); break;
-			case 1: buf.append("Enter the value with the appropriate number of significant figures:\n"); break;
-			case 2: int sf = (int)Math.ceil(-Math.log10(requiredPrecision/100.))+1;
-				buf.append("Include at least " + sf + " significant figures in your answer: \n"); break;
-			case 3: buf.append("Enter the value with the appropriate number of significant figures \n"); break;
-			default:
-			}
-			buf.append("____________" + parseString(tag) + "\n");
-			break;        
-		case 6: // FIVE_STAR rating
-			buf.append(text + "\n");
-			buf.append("Enter your rating from 1 to 5 stars: ______\n");
-			break;
-		case 7: // Short ESSAY question
-			buf.append(text + "\n");
-			buf.append("Enter your answer in 800 characters or less: ___________\n");
-			break;
-		}
-		return buf.toString();	
-	}
-	
 	public void addAttemptSave(boolean isCorrect) {
 		if (nTotalAttempts==null) initializeCounters();
 		nTotalAttempts++;
@@ -869,75 +582,23 @@ public class Question implements Serializable, Cloneable {
 		return nTotalAttempts==0?0:100*nCorrectAnswers/nTotalAttempts;
 	}
 	
-	private void initializeCounters() {
+	void initializeCounters() {
 		nTotalAttempts = 0;
 		nCorrectAnswers = 0;
 	}
 	
-	public boolean hasSolution() {
-		if (solution == null) solution = "";
-		return solution.length()>0?true:false;
-	}
-
-	public boolean hasHint() {
-		if (hint == null) hint = "";
-		return hint.length()>0?true:false;
-	}
-
-	int getQuestionType() {
-		return getQuestionType(this.type);
-	}
-	
-	static int getQuestionType(String type) {
-		if (type.equals("MULTIPLE_CHOICE")) return 1;
-		if (type.equals("TRUE_FALSE")) return 2;
-		if (type.equals("SELECT_MULTIPLE")) return 3;
-		if (type.equals("FILL_IN_WORD")) return 4;
-		if (type.equals("NUMERIC")) return 5;
-		if (type.equals("FIVE_STAR")) return 6;
-		if (type.equals("ESSAY")) return 7;
-		else return 0;
-	}
-
-	static String getQuestionType(int type) {
-		switch (type) {
-			case (1): return "MULTIPLE_CHOICE";
-			case (2): return "TRUE_FALSE";
-			case (3): return "SELECT_MULTIPLE";
-			case (4): return "FILL_IN_WORD";
-			case (5): return "NUMERIC";
-			case (6): return "FIVE_STAR";
-			case (7): return "ESSAY";
-			default: return "";
-		}
-	}
-	
-	public void setQuestionType(int t) { // create a blank form for a new question of type t
-		switch (t) {
-		case (1): type = "MULTIPLE_CHOICE"; break;
-		case (2): type = "TRUE_FALSE"; break;
-		case (3): type = "SELECT_MULTIPLE"; break;
-		case (4): type = "FILL_IN_WORD"; break;
-		case (5): type = "NUMERIC"; break;
-		case (6): type = "FIVE_STAR"; break;
-		case (7): type = "ESSAY"; break;
-		default:  type = "";
-		}
-	}
-
 	public String edit() {
 		StringBuffer buf = new StringBuffer();
-		this.validateFields();
 		try {
 			String[] choiceNames = {"ChoiceAText","ChoiceBText","ChoiceCText","ChoiceDText","ChoiceEText"};
 			char choice = 'a';
-			switch (this.getQuestionType()) {
-			case 1: // Multiple Choice
+			switch (this.type) {
+			case "multiple_choice": 
 				buf.append("Question Text:<br/><TEXTAREA name=QuestionText rows=5 cols=50 wrap=soft>" 
-						+ amp2html(text) + "</TEXTAREA><br/>");
+						+ amp2html(prompt) + "</TEXTAREA><br/>");
 				buf.append("<span style='color:#EE0000;font-size: small;'>Select only the best choice:</span><br/>");
 				for (int i=0;i<5;i++) { 
-					if (i < nChoices) {
+					if (i < choices.size()) {
 						buf.append("<input type=radio name=CorrectAnswer value='" + choice + "'");
 						if (correctAnswer.indexOf(choice) >= 0) buf.append(" CHECKED");
 						buf.append("/><input size=30 name=" + choiceNames[i] + " value='"); 
@@ -950,9 +611,9 @@ public class Question implements Serializable, Cloneable {
 				}
 				buf.append("<label>Check here to scramble the choices: <input type=checkbox name=ScrambleChoices value=true " + (this.scrambleChoices?"CHECKED":"") + " /></label><br/>");
 				break;
-			case 2: // True/False
+			case "true_false":
 				buf.append("Question Text:<br/><TEXTAREA name=QuestionText rows=5 cols=50 wrap=soft>" 
-						+ amp2html(text) + "</TEXTAREA><br/>");
+						+ amp2html(prompt) + "</TEXTAREA><br/>");
 				buf.append("<span style='color:#EE0000;font-size: small;'>Select true or false:</span><br/>");
 				buf.append("<input type=radio name=CorrectAnswer value='true'");
 					if (correctAnswer.equals("true")) buf.append(" CHECKED");
@@ -961,12 +622,12 @@ public class Question implements Serializable, Cloneable {
 				if (correctAnswer.equals("false")) buf.append(" CHECKED");
 				buf.append("/> False<br/>");
 				break;
-			case 3: // Select Multiple
+			case "checkbox": 
 				buf.append("Question Text:<br/><TEXTAREA name=QuestionText rows=5 cols=50 wrap=soft>" 
-						+ amp2html(text) + "</TEXTAREA><br/>");
+						+ amp2html(prompt) + "</TEXTAREA><br/>");
 				buf.append("<span style='color:#EE0000;font-size: small;'>Select all of the correct answers:</span><br/>");
 				for (int i=0;i<5;i++){
-					if (i < nChoices) {
+					if (i < choices.size()) {
 						buf.append("<input type=checkbox name=CorrectAnswer value='" + choice + "'");
 						if (correctAnswer.indexOf(choice) >= 0) buf.append(" CHECKED");
 						buf.append("/><input size=30 name=" + choiceNames[i] + " value='"); 
@@ -979,20 +640,19 @@ public class Question implements Serializable, Cloneable {
 				}
 				buf.append("<label>Check here to scramble the choices: <input type=checkbox name=ScrambleChoices value=true " + (this.scrambleChoices?"CHECKED":"") + " /></label><br/>");
 				break;
-			case 4: // Fill-in-the-Word
+			case "fill_in_blank":
 				buf.append("Question Text:<br/><TEXTAREA name=QuestionText rows=5 cols=50 wrap=soft>" 
-						+ amp2html(text) + "</TEXTAREA><br/>");
+						+ amp2html(prompt) + "</TEXTAREA><br/>");
 				buf.append("<span style='color:#EE0000;font-size: small;'>Enter the correct word or phrase.<br/>"
 						+ "Multiple correct answers can be entered as a comma-separated list.</span><br/>");
 				buf.append("<input type=text name=CorrectAnswer value=\"" 
 						+ quot2html(amp2html(correctAnswer)) + "\"'/><br/>");
 				buf.append("<TEXTAREA name=QuestionTag rows=5 cols=60 wrap=soft>" 
-						+ amp2html(tag) + "</TEXTAREA><br/>");
-				buf.append("<label><input type=checkbox name=StrictSpelling value=true " + (this.strictSpelling?"CHECKED":"") + " />Strict spelling</label><br/><br/>");
+						+ amp2html(units) + "</TEXTAREA><br/>");
 				break;
-			case 5: // Numeric Answer
+			case "numeric":
 				buf.append("Question Text:<br/><TEXTAREA name=QuestionText rows=5 cols=60 wrap=soft>" 
-						+ amp2html(text) + "</TEXTAREA><br/>");
+						+ amp2html(prompt) + "</TEXTAREA><br/>");
 				buf.append("<FONT SIZE=-2>Significant figures: <input size=5 name=SignificantFigures value='" + significantFigures + "'/> Required precision: <input size=5 name=RequiredPrecision value='" + requiredPrecision + "'/> (set to zero to require exact answer)</FONT><br/>");
 				switch (getNumericItemType()) {
 				case 0: buf.append("<span style='color:#EE0000;font-size: small;'>Enter the exact value. <a role='button' href=# onclick=\"alert('Your answer must have exactly the correct value. You may use scientific E notation. Example: enter 3.56E-12 to represent the number 3.56\u00D710\u207B\u00B9\u00B2');return false;\">&#9432;</a></span><br/>"); break;
@@ -1005,7 +665,7 @@ public class Question implements Serializable, Cloneable {
 				buf.append("Correct answer:");
 				buf.append("<INPUT TYPE=TEXT NAME=CorrectAnswer VALUE='" + correctAnswer + "'/> ");
 				buf.append(" Units:<INPUT TYPE=TEXT NAME=QuestionTag SIZE=8 VALUE='" 
-						+ quot2html(amp2html(tag)) + "'/><br/>");
+						+ quot2html(amp2html(units)) + "'/><br/>");
 				buf.append("Parameters:<input name=ParameterString value='" 
 						+ parameterString + "'/><FONT SIZE=-2><a href=# onClick=\"javascript:document.getElementById('detail1').innerHTML="
 						+ "'You may embed up to 4 parameters (a b c d) in a question using a parameter string like<br/>"
@@ -1016,21 +676,9 @@ public class Question implements Serializable, Cloneable {
 						+ "Correct answer: #22.9898*a/1000*b/10# g<p></p>"
 						+ "You can also display fractions in vertical format using encoding like (|numerator|denominator|)<br/><br/>'\";>What's This?</a></FONT>");
 				buf.append("<div id=detail1></div>");
-				buf.append("Hint:<br/><TEXTAREA NAME=Hint ROWS=3 COLS=60 WRAP=SOFT>"
-						+ amp2html(hint) + "</TEXTAREA><br/>");
-				buf.append("Solution:<br/><TEXTAREA NAME=Solution ROWS=10 COLS=60 WRAP=SOFT>" 
-						+ amp2html(solution) + "</TEXTAREA><br/>");
 				break;
-			case 6:  // 5-Star rating
-				buf.append("Question Text:<br/><TEXTAREA name=QuestionText rows=5 cols=50 wrap=soft>" + amp2html(text) + "</TEXTAREA><br/>");
-				buf.append("<span id='vote' style='color:#990000;font-size:small;'>(click a star):</span><br/>");
-				for (int istar=1;istar<6;istar++) {
-					buf.append("<img src='/images/star1.gif' id='" + istar + "' style='width:30px; height:30px;' alt='empty star' />");
-				}
-				buf.append("<br/>");
-				break;
-			case 7:  // Short ESSAY
-				buf.append("Question Text:<br/><TEXTAREA name=QuestionText rows=5 cols=50 wrap=soft>" + amp2html(text) + "</TEXTAREA><br/>");
+			case "essay": 
+				buf.append("Question Text:<br/><TEXTAREA name=QuestionText rows=5 cols=50 wrap=soft>" + amp2html(prompt) + "</TEXTAREA><br/>");
 				buf.append("<span style='color:#990000;font-size:small;'>(800 characters max):</span><br/>");
 				buf.append("<div style='border: solid 2px;width:300px;height:100px'></div>");
 				buf.append("<br/>");
@@ -1053,8 +701,8 @@ public class Question implements Serializable, Cloneable {
 	
 	boolean isCorrect(String studentAnswer){
 		if (studentAnswer == null || studentAnswer.isEmpty() || hasNoCorrectAnswer()) return false;
-		switch (getQuestionType()) {
-		case 4:  // Fill-in-the-word
+		switch (type) {
+		case "fill_in_blank":
 			Collator compare = Collator.getInstance();
 			compare.setStrength(Collator.PRIMARY);
 			studentAnswer = studentAnswer.replaceAll("\\W", "");
@@ -1062,13 +710,11 @@ public class Question implements Serializable, Cloneable {
 			for (int i=0;i<correctAnswers.length;i++) {
 				correctAnswers[i] = correctAnswers[i].replaceAll("\\W","");
 				if (compare.equals(studentAnswer,correctAnswers[i])) return true;
-				else if (!strictSpelling && closeEnough(studentAnswer.toLowerCase(),correctAnswers[i].toLowerCase())) return true;
+				else if (closeEnough(studentAnswer.toLowerCase(),correctAnswers[i].toLowerCase())) return true;
 			}
 			return false;
-		case 5: // Numeric Answer
+		case "numeric":
 			return hasCorrectSigFigs(studentAnswer) && agreesToRequiredPrecision(studentAnswer);
-		case 6: // Five star rating
-			return !studentAnswer.isEmpty();
 		default:  // exact match to non-numeric answer (MULTIPLE_CHOICE, TRUE_FALSE, SELECT_MULTIPLE)
 			return correctAnswer.equals(studentAnswer);
 		}
@@ -1276,18 +922,18 @@ public class Question implements Serializable, Cloneable {
 	
 	public String getCorrectAnswerForSage() { 
 		// similar to getCorrectAnswer but expands MULTIPLE_CHOICE and SELECT_MULTIPLE answers
-		switch (getQuestionType()) {
-		case 1: // MULTIPLE_CHOICE
-		case 3: // SELECT_MULTIPLE
+		switch (type) {
+		case "multiple_choice": 
+		case "checkbox": 
 			char[] ch = correctAnswer.toCharArray();
 			String ans = "";
 			for (char c : ch) ans += choices.get(c - 'a') + "\n";
 			ans = ans.substring(0,ans.length()-2); // trims the last newline character
 			return ans;
-		case 4: // FILL-IN-WORD
+		case "fill_in_blank": 
 			String[] answers = correctAnswer.split(",");
 			return answers[0];
-		case 5: // NUMERIC
+		case "numeric":
 			return parseString(correctAnswer);
 		default: return correctAnswer;
 		}

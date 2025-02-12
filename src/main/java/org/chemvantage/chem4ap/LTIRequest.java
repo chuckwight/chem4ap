@@ -41,8 +41,8 @@ public class LTIRequest extends HttpServlet {
 	public void doGet(HttpServletRequest request, HttpServletResponse response) 
 			throws IOException {
 		// Temporary hack for launching the SPA. Normally, this servlet does not accept GET requests
-		response.sendRedirect("/?t=" + Util.getToken("chuck"));
-	}
+			response.sendRedirect("/exercises/index.html?t=" + Util.getToken(new User().getTokenSignature()));
+		}
 	
 	@Override
 	public void doPost(HttpServletRequest request, HttpServletResponse response) 
@@ -134,7 +134,7 @@ public class LTIRequest extends HttpServlet {
 		buf.append("<div><label><input type=radio name=AssignmentType required value='Exercises' />Exercises</label></div>"
 				+ "<div><label><input type=radio name=AssignmentType required value='Homework' />Homework</label></div>");
 		List<APChemUnit> units = null;
-		units = ofy().load().type(APChemUnit.class).list();
+		units = ofy().load().type(APChemUnit.class).order("unitNumber").list();
 		buf.append("<h2>Please select one of the AP Chemistry units below:</h2>");
 		for (APChemUnit u : units) {
 			buf.append("<div><label><input type=radio name=UnitId required value=" + u.id + " />" + u.title + "</label></div>");

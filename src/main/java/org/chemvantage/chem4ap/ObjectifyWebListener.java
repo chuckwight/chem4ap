@@ -25,6 +25,7 @@ public class ObjectifyWebListener implements ServletContextListener {
 	  ObjectifyService.register(Assignment.class);
 	  ObjectifyService.register(Deployment.class);
 	  ObjectifyService.register(Nonce.class);
+	  ObjectifyService.register(Question.class);
 	  ObjectifyService.register(RSAKeyPair.class);
 	  ObjectifyService.register(User.class);
 	  ObjectifyService.register(Util.class);

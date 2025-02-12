@@ -13,7 +13,7 @@ public class APChemTopic implements Serializable {
 	
 	@Id 	Long id;
 	@Index	Long unitId;
-			int unitNumber;
+	@Index	int unitNumber;
 	@Index 	int topicNumber;
 	 		String title;
 	 		String learningObjective;
