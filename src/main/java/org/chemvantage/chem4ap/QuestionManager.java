@@ -51,7 +51,13 @@ public class QuestionManager extends HttpServlet {
 				Long unitId = null;
 				try {
 					unitId = Long.parseLong(request.getParameter("UnitId"));
+				} catch (Exception e) {}
+				try {
 					topicId = Long.parseLong(request.getParameter("TopicId")); 
+					if (unitId == null) {
+						APChemTopic topic = ofy().load().type(APChemTopic.class).id(topicId).safe();
+						unitId = topic.unitId;
+					}
 				} catch (Exception e) {}
 				out.println(viewQuestions(unitId,topicId));
 			}
@@ -104,7 +110,7 @@ public class QuestionManager extends HttpServlet {
 		try {
 			type = request.getParameter("QuestionType");
 		}catch (Exception e) {}
-		String questionText = request.getParameter("QuestionText");
+		String prompt = request.getParameter("Prompt");
 		ArrayList<String> choices = new ArrayList<String>();
 		char choice = 'A';
 		for (int i=0;i<5;i++) {
@@ -131,13 +137,14 @@ public class QuestionManager extends HttpServlet {
 			for (int i = 0; i < allAnswers.length; i++) correctAnswer += allAnswers[i];
 		} catch (Exception e) {
 			correctAnswer = request.getParameter("CorrectAnswer");
+			if (correctAnswer == null) correctAnswer = "";
 		}
 		String parameterString = request.getParameter("ParameterString");
 		if (parameterString == null) parameterString = "";
 		
 		q.topicId = topicId;
 		q.type = type;
-		q.prompt = questionText;
+		q.prompt = prompt;
 		q.choices = choices;
 		q.requiredPrecision = requiredPrecision;
 		q.significantFigures = significantFigures;
@@ -232,12 +239,11 @@ public class QuestionManager extends HttpServlet {
 					+ "(up to a maximum of 5). Be sure to "
 					+ "select all of the correct answers to the question."); break;
 			case "fill_in_blank": 
-				buf.append("<h3>Fill-in-Word Question</h3>");
-				buf.append("Start the question text in the upper textarea box. Indicate "
-					+ "the correct answer (and optionally, an alternative correct answer) in "
-					+ "the middle boxes, and the end of the question text below that.  The answers "
-					+ "are not case-sensitive or punctuation-sensitive, but spelling must "
-					+ "be exact."); break;
+				buf.append("<h3>Fill-in-Blank Question</h3>");
+				buf.append("Write the prompt as a sentence containing a blank (________). "
+					+ "Write the correct answer (and optionally, an alternative correct answer) in "
+					+ "the box below using commas to separate the correct options.  The answers "
+					+ "are not case-sensitive or punctuation-sensitive."); break;
 			case "numeric": 
 				buf.append("<h3>Numeric Question</h3>");
 				buf.append("Fill in the question text in the upper textarea box and "
@@ -253,7 +259,7 @@ public class QuestionManager extends HttpServlet {
 			}
 			Question question = new Question(questionType);
 			buf.append("<p><FORM METHOD=POST ACTION=/questions>");
-			buf.append("<INPUT TYPE=HIDDEN NAME=QuestionType VALUE=" + questionType + ">");
+			buf.append("<INPUT TYPE=HIDDEN NAME=QuestionType VALUE=" + questionType + " />");
 			APChemTopic topic = ofy().load().type(APChemTopic.class).id(topicId).safe();
 			buf.append("Topic: " + topic.title + "<br>"
 					+ "<input type=hidden name=TopicId value=" + topic.id + " />");
@@ -265,7 +271,7 @@ public class QuestionManager extends HttpServlet {
 					+ "<input type=hidden name=UserRequest value='NewQuestion' />"
 					+ "<input type=hidden name=TopicId value=" + topicId + " />"
 					+ "Select a question type: " + questionTypeDropDownBox("")
-					+ "</form>");
+					+ "<input type=submit value=Go /></form>");
 		}
 		return buf.toString() + Util.foot();
 	}
@@ -330,13 +336,13 @@ public class QuestionManager extends HttpServlet {
 
 	String questionTypeDropDownBox(String questionType) {
 		StringBuffer buf = new StringBuffer();
-		buf.append("\n<SELECT NAME=QuestionType onChange=submit()><option>Select a question type</option>"
-				+ "<OPTION VALUE=multiple_choice" + (questionType=="multiple_choice"?" SELECTED>":">") + "Multiple Choice</OPTION>"
-				+ "<OPTION VALUE=true_false" + (questionType=="true_false"?" SELECTED>":">") + "True/False</OPTION>"
-				+ "<OPTION VALUE=checkbox" + (questionType=="checkbox"?" SELECTED>":">") + "Checkbox</OPTION>"
-				+ "<OPTION VALUE=fill_in_blank" + (questionType=="fill_in_blank"?" SELECTED>":">") + "Fill in Blank</OPTION>"
-				+ "<OPTION VALUE=numeric" + (questionType=="numeric"?" SELECTED>":">") + "Numeric</OPTION>"
-				+ "<OPTION VALUE=essay" + (questionType=="essay"?" SELECTED>":">") + "Essay</OPTION>"
+		buf.append("\n<SELECT NAME=QuestionType><option>Select a question type</option>"
+				+ "<OPTION VALUE=multiple_choice" + ("multiple_choice".equals(questionType)?" SELECTED>":">") + "Multiple Choice</OPTION>"
+				+ "<OPTION VALUE=true_false" + ("true_false".equals(questionType)?" SELECTED>":">") + "True/False</OPTION>"
+				+ "<OPTION VALUE=checkbox" + ("checkbox".equals(questionType)?" SELECTED>":">") + "Checkbox</OPTION>"
+				+ "<OPTION VALUE=fill_in_blank" + ("fill_in_blank".equals(questionType)?" SELECTED>":">") + "Fill in Blank</OPTION>"
+				+ "<OPTION VALUE=numeric" + ("numeric".equals(questionType)?" SELECTED>":">") + "Numeric</OPTION>"
+				+ "<OPTION VALUE=essay" + ("essay".equals(questionType)?" SELECTED>":">") + "Essay</OPTION>"
 				+ "</SELECT>");
 		return buf.toString();
 	}
@@ -390,24 +396,17 @@ public class QuestionManager extends HttpServlet {
 		
 		if (unit != null && topic != null) {  // display the questions
 			List<Question> questions = ofy().load().type(Question.class).filter("topicId",topicId).list();
-			buf.append("This topic has " + questions.size() + " question items.<p>");
+			buf.append("This topic has " + questions.size() + " question items. ");
+			buf.append("<a href=/questions?UserRequest=NewQuestion&TopicId=" + topic.id + ">Create a New Question</a><p>");	
+			
 			for (Question q : questions) {
 				q.setParameters();
 				buf.append(q.printAll());
 			}
-			buf.append("<p><a href=/questions?UserRequest=NewQuestion&TopicId=" + topic.id + ">Create a New Question</a><p>");	
 		}
 		return buf.toString() + Util.foot();
 	}
 	
-	class SortByQuestionText implements Comparator<Question> {
-		public int compare(Question q1,Question q2) {
-			int rank = q1.prompt.compareTo(q2.prompt); // alphabetize on Question.text
-			if (rank==0) rank = q1.id.compareTo(q2.id); // tie breaker			
-			return rank;  
-		}
-	}
-
 	class SortByPctSuccess implements Comparator<Question> {
 		public int compare(Question q1,Question q2) {
 			int rank = q2.getPctSuccess() - q1.getPctSuccess(); // sort more successful questions first

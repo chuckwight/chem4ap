@@ -594,7 +594,7 @@ public class Question implements Serializable, Cloneable {
 			char choice = 'a';
 			switch (this.type) {
 			case "multiple_choice": 
-				buf.append("Question Text:<br/><TEXTAREA name=QuestionText rows=5 cols=50 wrap=soft>" 
+				buf.append("Question Prompt:<br/><TEXTAREA name=Prompt rows=5 cols=50 wrap=soft>" 
 						+ amp2html(prompt) + "</TEXTAREA><br/>");
 				buf.append("<span style='color:#EE0000;font-size: small;'>Select only the best choice:</span><br/>");
 				for (int i=0;i<5;i++) { 
@@ -612,7 +612,7 @@ public class Question implements Serializable, Cloneable {
 				buf.append("<label>Check here to scramble the choices: <input type=checkbox name=ScrambleChoices value=true " + (this.scrambleChoices?"CHECKED":"") + " /></label><br/>");
 				break;
 			case "true_false":
-				buf.append("Question Text:<br/><TEXTAREA name=QuestionText rows=5 cols=50 wrap=soft>" 
+				buf.append("Question Prompt:<br/><TEXTAREA name=Prompt rows=5 cols=50 wrap=soft>" 
 						+ amp2html(prompt) + "</TEXTAREA><br/>");
 				buf.append("<span style='color:#EE0000;font-size: small;'>Select true or false:</span><br/>");
 				buf.append("<input type=radio name=CorrectAnswer value='true'");
@@ -623,7 +623,7 @@ public class Question implements Serializable, Cloneable {
 				buf.append("/> False<br/>");
 				break;
 			case "checkbox": 
-				buf.append("Question Text:<br/><TEXTAREA name=QuestionText rows=5 cols=50 wrap=soft>" 
+				buf.append("Question Prompt:<br/><TEXTAREA name=Prompt rows=5 cols=50 wrap=soft>" 
 						+ amp2html(prompt) + "</TEXTAREA><br/>");
 				buf.append("<span style='color:#EE0000;font-size: small;'>Select all of the correct answers:</span><br/>");
 				for (int i=0;i<5;i++){
@@ -641,17 +641,15 @@ public class Question implements Serializable, Cloneable {
 				buf.append("<label>Check here to scramble the choices: <input type=checkbox name=ScrambleChoices value=true " + (this.scrambleChoices?"CHECKED":"") + " /></label><br/>");
 				break;
 			case "fill_in_blank":
-				buf.append("Question Text:<br/><TEXTAREA name=QuestionText rows=5 cols=50 wrap=soft>" 
+				buf.append("Question Prompt:<br/><TEXTAREA name=Prompt rows=5 cols=50 wrap=soft>" 
 						+ amp2html(prompt) + "</TEXTAREA><br/>");
 				buf.append("<span style='color:#EE0000;font-size: small;'>Enter the correct word or phrase.<br/>"
 						+ "Multiple correct answers can be entered as a comma-separated list.</span><br/>");
 				buf.append("<input type=text name=CorrectAnswer value=\"" 
 						+ quot2html(amp2html(correctAnswer)) + "\"'/><br/>");
-				buf.append("<TEXTAREA name=QuestionTag rows=5 cols=60 wrap=soft>" 
-						+ amp2html(units) + "</TEXTAREA><br/>");
 				break;
 			case "numeric":
-				buf.append("Question Text:<br/><TEXTAREA name=QuestionText rows=5 cols=60 wrap=soft>" 
+				buf.append("Question Prompt:<br/><TEXTAREA name=Prompt rows=5 cols=60 wrap=soft>" 
 						+ amp2html(prompt) + "</TEXTAREA><br/>");
 				buf.append("<FONT SIZE=-2>Significant figures: <input size=5 name=SignificantFigures value='" + significantFigures + "'/> Required precision: <input size=5 name=RequiredPrecision value='" + requiredPrecision + "'/> (set to zero to require exact answer)</FONT><br/>");
 				switch (getNumericItemType()) {
@@ -664,7 +662,7 @@ public class Question implements Serializable, Cloneable {
 				}			
 				buf.append("Correct answer:");
 				buf.append("<INPUT TYPE=TEXT NAME=CorrectAnswer VALUE='" + correctAnswer + "'/> ");
-				buf.append(" Units:<INPUT TYPE=TEXT NAME=QuestionTag SIZE=8 VALUE='" 
+				buf.append(" Units:<INPUT TYPE=TEXT NAME=Units SIZE=8 VALUE='" 
 						+ quot2html(amp2html(units)) + "'/><br/>");
 				buf.append("Parameters:<input name=ParameterString value='" 
 						+ parameterString + "'/><FONT SIZE=-2><a href=# onClick=\"javascript:document.getElementById('detail1').innerHTML="
@@ -678,7 +676,7 @@ public class Question implements Serializable, Cloneable {
 				buf.append("<div id=detail1></div>");
 				break;
 			case "essay": 
-				buf.append("Question Text:<br/><TEXTAREA name=QuestionText rows=5 cols=50 wrap=soft>" + amp2html(prompt) + "</TEXTAREA><br/>");
+				buf.append("Question Prompt:<br/><TEXTAREA name=Prompt rows=5 cols=50 wrap=soft>" + amp2html(prompt) + "</TEXTAREA><br/>");
 				buf.append("<span style='color:#990000;font-size:small;'>(800 characters max):</span><br/>");
 				buf.append("<div style='border: solid 2px;width:300px;height:100px'></div>");
 				buf.append("<br/>");
