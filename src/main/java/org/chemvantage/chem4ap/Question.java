@@ -36,6 +36,7 @@ import java.util.Random;
 import com.bestcode.mathparser.IMathParser;
 import com.bestcode.mathparser.MathParserFactory;
 import com.google.gson.JsonArray;
+import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import com.googlecode.objectify.annotation.Entity;
@@ -587,7 +588,27 @@ public class Question implements Serializable, Cloneable {
 		nCorrectAnswers = 0;
 	}
 	
-	public String edit() {
+	String edit(JsonObject jq) {
+		type = jq.get("type").getAsString();
+		prompt = jq.get("prompt").getAsString();
+		correctAnswer = jq.get("correctAnswer").getAsString();
+		switch (type) {
+		case "multiple_choice":
+		case "checkbox":
+			JsonArray chs = jq.get("choices").getAsJsonArray();
+			for (int i=0;i<chs.size();i++) {
+				choices.add(chs.get(i).getAsString());
+			}
+			break;
+		case "numeric":
+			JsonElement unts = jq.get("units");
+			if (units != null) units = unts.getAsString();
+			break;
+		}
+		return edit();
+	}
+	
+	String edit() {
 		StringBuffer buf = new StringBuffer();
 		try {
 			String[] choiceNames = {"ChoiceAText","ChoiceBText","ChoiceCText","ChoiceDText","ChoiceEText"};

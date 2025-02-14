@@ -10,6 +10,9 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
+
 import jakarta.servlet.ServletException;
 import jakarta.servlet.annotation.WebServlet;
 import jakarta.servlet.http.HttpServlet;
@@ -42,6 +45,9 @@ public class QuestionManager extends HttpServlet {
 				break;
 			case "NewQuestion": 
 				out.println(newQuestionForm(request)); 
+				break;
+			case "NewJson":
+				out.println(newJsonForm(request));
 				break;
 			case "Preview":
 				out.println(previewQuestion(request));
@@ -142,6 +148,7 @@ public class QuestionManager extends HttpServlet {
 		String parameterString = request.getParameter("ParameterString");
 		if (parameterString == null) parameterString = "";
 		
+		q.assignmentType = request.getParameter("AssignmentType");
 		q.topicId = topicId;
 		q.type = type;
 		q.prompt = prompt;
@@ -153,14 +160,6 @@ public class QuestionManager extends HttpServlet {
 		q.parameterString = parameterString;
 		q.scrambleChoices = Boolean.parseBoolean(request.getParameter("ScrambleChoices"));
 		return q;
-	}
-	
-	String topicSelectBox(Long topicId) {
-		StringBuffer buf = new StringBuffer("<select name=TopicId>");
-		if (topicList == null) refreshTopics();
-		for (APChemTopic t : topicList) buf.append("<option value=" + t.id + (t.id.equals(topicId)?" selected>":">") + t.title + "</option>");
-		buf.append("</select>");
-		return buf.toString();
 	}
 	
 	void createQuestion(HttpServletRequest request) { //previously type long
@@ -210,7 +209,65 @@ public class QuestionManager extends HttpServlet {
 	
 		return buf.toString() + Util.foot();
 	}
-
+	
+	String newJsonForm(HttpServletRequest request) {
+		StringBuffer buf = new StringBuffer(Util.head("Editor"));
+		buf.append("<h1>Edit</h1><h2>New Question</h2>");
+		
+		try {
+			Long topicId = Long.parseLong(request.getParameter("TopicId"));
+			APChemTopic topic = ofy().load().type(APChemTopic.class).id(topicId).safe();
+			JsonObject jq = JsonParser.parseString(request.getParameter("json")).getAsJsonObject();
+			String questionType = jq.get("type").getAsString();
+			switch (questionType) {
+			case "multiple_choice": 
+				buf.append("<h3>Multiple-Choice Question</h3>");
+				buf.append("Fill in the question text and the possible answers "
+					+ "(up to a maximum of 5). Be sure to select the single best "
+					+ "answer to the question."); break;
+			case "true_false": 
+				buf.append("<h3>True-False Question</h3>");
+				buf.append("Write the question as an affirmative statement. Then "
+					+ "indicate below whether the statement is true or false."); break;
+			case "checkbox": 
+				buf.append("<h3>Select-Multiple Question</h3>");
+				buf.append("Fill in the question text and the possible answers "
+					+ "(up to a maximum of 5). Be sure to "
+					+ "select all of the correct answers to the question."); break;
+			case "fill_in_blank": 
+				buf.append("<h3>Fill-in-Blank Question</h3>");
+				buf.append("Write the prompt as a sentence containing a blank (________). "
+					+ "Write the correct answer (and optionally, an alternative correct answer) in "
+					+ "the box below using commas to separate the correct options.  The answers "
+					+ "are not case-sensitive or punctuation-sensitive."); break;
+			case "numeric": 
+				buf.append("<h3>Numeric Question</h3>");
+				buf.append("Fill in the question text in the upper textarea box and "
+					+ "the correct numeric answer below. Also indicate the required precision "
+					+ "of the student's response in percent (default = 2%). Use the bottom "
+					+ "textarea box to finish the question text and/or to indicate the "
+					+ "expected dimensions or units of the student's answer."); break;
+			case "essay": 
+				buf.append("<h3>EssayQuestion</h3>");
+				buf.append("Fill in the question text. The user will be asked to provide a short "
+					+ "essay response."); break;
+			default: buf.append("An unexpected error occurred. Please try again.");
+			}
+			Question question = new Question(questionType);
+			buf.append("<p><FORM METHOD=POST ACTION=/questions>");
+			buf.append("<INPUT TYPE=HIDDEN NAME=QuestionType VALUE=" + questionType + " />"
+					+ "<input type=hidden name=AssignmentType value=" + request.getParameter("AssignmentType") + " />");
+			buf.append("Topic: " + topic.title + "<br>"
+					+ "<input type=hidden name=TopicId value=" + topic.id + " />");
+			
+			buf.append(question.edit(jq));
+			buf.append("<INPUT TYPE=SUBMIT NAME=UserRequest VALUE='Preview'></FORM>");
+		} catch (Exception e) {
+			buf.append(e.getMessage());
+		}
+		return buf.toString();
+	}
+	
 	String newQuestionForm(HttpServletRequest request) {
 		StringBuffer buf = new StringBuffer(Util.head("Editor"));
 		
@@ -219,6 +276,7 @@ public class QuestionManager extends HttpServlet {
 		try {
 			topicId = Long.parseLong(request.getParameter("TopicId"));
 		} catch (Exception e) {}		
+		APChemTopic topic = ofy().load().type(APChemTopic.class).id(topicId).safe();
 		
 		String questionType = null;;		
 		try {
@@ -260,25 +318,32 @@ public class QuestionManager extends HttpServlet {
 			Question question = new Question(questionType);
 			buf.append("<p><FORM METHOD=POST ACTION=/questions>");
 			buf.append("<INPUT TYPE=HIDDEN NAME=QuestionType VALUE=" + questionType + " />");
-			APChemTopic topic = ofy().load().type(APChemTopic.class).id(topicId).safe();
 			buf.append("Topic: " + topic.title + "<br>"
 					+ "<input type=hidden name=TopicId value=" + topic.id + " />");
 			
 			buf.append(question.edit());
 			buf.append("<INPUT TYPE=SUBMIT NAME=UserRequest VALUE='Preview'></FORM>");
 		} catch (Exception e) {
+			buf.append("Topic: " + topic.title);
 			buf.append("<form method=get>"
 					+ "<input type=hidden name=UserRequest value='NewQuestion' />"
+					+ "<input type=hidden name=AssignmentType value=" + request.getParameter("AssignmentType") + " />"
 					+ "<input type=hidden name=TopicId value=" + topicId + " />"
 					+ "Select a question type: " + questionTypeDropDownBox("")
 					+ "<input type=submit value=Go /></form>");
-		}
+			buf.append("<form method=get>"
+					+ "<input type=hidden name=UserRequest value='NewJson' />"
+					+ "<input type=hidden name=TopicId value=" + topicId + " />"
+					+ "Paste a JSON string here: <input type=text name=json />"
+					+ "<input type=submit value=Go /></form>");
+			}
 		return buf.toString() + Util.foot();
 	}
 
 	String previewQuestion(HttpServletRequest request) {
 		StringBuffer buf = new StringBuffer(Util.head("Editor"));
 		try {
+			String assignmentType = request.getParameter("AssignmentTyoe");
 			long questionId = 0;
 			boolean current = false;
 			boolean proposed = false;
@@ -322,6 +387,8 @@ public class QuestionManager extends HttpServlet {
 			buf.append("<INPUT TYPE=SUBMIT NAME=UserRequest VALUE='Quit'>");
 			
 			buf.append("<hr><h2>Continue Editing</h2>");
+			buf.append("AssignmentType: " + assignmentType + "<br/>"
+					+ "<input type=hidden name=AssignmentType value=" + assignmentType + " />");
 			buf.append("Topic:" + topicSelectBox(topicId) + "<br/>");
 			buf.append("Question Type:" + questionTypeDropDownBox(q.type) + "<br/>");
 			buf.append(q.edit());
@@ -352,6 +419,14 @@ public class QuestionManager extends HttpServlet {
 		topicList = ofy().load().type(APChemTopic.class).list();
 		topicMap = new HashMap<Long,APChemTopic>();
 		for (APChemTopic t : topicList) topicMap.put(t.id, t);
+	}
+
+	String topicSelectBox(Long topicId) {
+		StringBuffer buf = new StringBuffer("<select name=TopicId>");
+		if (topicList == null) refreshTopics();
+		for (APChemTopic t : topicList) buf.append("<option value=" + t.id + (t.id.equals(topicId)?" selected>":">") + t.title + "</option>");
+		buf.append("</select>");
+		return buf.toString();
 	}
 
 	void updateQuestion(HttpServletRequest request) {
@@ -399,7 +474,7 @@ public class QuestionManager extends HttpServlet {
 		if (unit != null && topic != null) {  // display the questions
 			List<Question> questions = ofy().load().type(Question.class).filter("assignmentType",assignmentType).filter("topicId",topicId).list();
 			buf.append("This topic has " + questions.size() + " question items. ");
-			buf.append("<a href=/questions?UserRequest=NewQuestion&TopicId=" + topic.id + ">Create a New Question</a><p>");	
+			buf.append("<a href=/questions?UserRequest=NewQuestion&AssignmentType=" + assignmentType + "&TopicId=" + topic.id + ">Create a New Question</a><p>");	
 			
 			for (Question q : questions) {
 				q.setParameters();
