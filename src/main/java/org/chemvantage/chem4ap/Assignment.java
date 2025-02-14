@@ -17,6 +17,8 @@
 
 package org.chemvantage.chem4ap;
 
+import static com.googlecode.objectify.ObjectifyService.ofy;
+
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
@@ -50,6 +52,9 @@ public class Assignment implements java.lang.Cloneable {
 		this.unitId = unitId;
 		this.platform_deployment_id = platform_deployment_id;
 		this.created = new Date();
+		APChemUnit unit = ofy().load().type(APChemUnit.class).id(unitId).now();
+		this.topicIds = unit.topicIds;
+		for (Long id : topicIds) questionKeys.addAll(ofy().load().type(Question.class).filter("assignmentType", assignmentType).filter("topicId",id).keys().list());
 	}
 
 	protected Assignment clone() throws CloneNotSupportedException {

@@ -36,14 +36,14 @@ import jakarta.servlet.http.HttpServletResponse;
 public class LTIRequest extends HttpServlet {
 
 	private static final long serialVersionUID = 137L;
-
+/*
 	@Override
 	public void doGet(HttpServletRequest request, HttpServletResponse response) 
 			throws IOException {
 		// Temporary hack for launching the SPA. Normally, this servlet does not accept GET requests
 			response.sendRedirect("/exercises/index.html?t=" + Util.getToken(new User().getTokenSignature()));
 		}
-	
+*/	
 	@Override
 	public void doPost(HttpServletRequest request, HttpServletResponse response) 
 			throws IOException {
@@ -132,7 +132,7 @@ public class LTIRequest extends HttpServlet {
 		
 		buf.append("<h2>Select the type of assignment to create:</h2>");
 		buf.append("<div><label><input type=radio name=AssignmentType required value='Exercises' />Exercises</label></div>"
-				+ "<div><label><input type=radio name=AssignmentType required value='Homework' />Homework</label></div>");
+				+ "<div><label><input type=radio name=AssignmentType required value='Homework (coming soon)' />Homework</label></div>");
 		List<APChemUnit> units = null;
 		units = ofy().load().type(APChemUnit.class).order("unitNumber").list();
 		buf.append("<h2>Please select one of the AP Chemistry units below:</h2>");
@@ -163,8 +163,9 @@ public class LTIRequest extends HttpServlet {
 			Date now = new Date();
 			Date exp = new Date(now.getTime() + 5400000L); // 90 minutes from now
 			Deployment d = Deployment.getInstance(platform_id + "/" + deployment_id);
-			APChemUnit u = ofy().load().type(APChemUnit.class).id(unitId).safe();
-			String title = assignmentType + " - " + u.title;
+			APChemUnit unit = ofy().load().type(APChemUnit.class).id(unitId).safe();
+			String title = assignmentType + " - " + unit.title;
+			
 			Assignment a = new Assignment(assignmentType,title,unitId,d.platform_deployment_id);
 			ofy().save().entity(a).now();
 			

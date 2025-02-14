@@ -375,10 +375,12 @@ public class QuestionManager extends HttpServlet {
 		refreshTopics();	
 		buf.append("<h2>Question Items</h2>\n"
 				+ "Select a unit and topic below to edit the associated questions.<p>\n");
+		String assignmentType = "Exercises";
 		// Make a drop-down selector for units
 		APChemUnit unit = unitId==null?null:ofy().load().type(APChemUnit.class).id(unitId).now();
 		buf.append("<form>"
 				+ "<input type=hidden name=UserRequest value=ViewQuestions />"
+				+ "<input type=radio name=AssignmentType value=Exercises checked />"
 				+ "<select name=UnitId onchange=submit()><option>Select a Unit</option>");
 		for (APChemUnit u : unitList) buf.append("<option value=" + u.id + (u.equals(unit)? " selected":"") + ">" + u.title + "</option>");
 		buf.append("</select>&nbsp;");
@@ -395,7 +397,7 @@ public class QuestionManager extends HttpServlet {
 		}
 		
 		if (unit != null && topic != null) {  // display the questions
-			List<Question> questions = ofy().load().type(Question.class).filter("topicId",topicId).list();
+			List<Question> questions = ofy().load().type(Question.class).filter("assignmentType",assignmentType).filter("topicId",topicId).list();
 			buf.append("This topic has " + questions.size() + " question items. ");
 			buf.append("<a href=/questions?UserRequest=NewQuestion&TopicId=" + topic.id + ">Create a New Question</a><p>");	
 			

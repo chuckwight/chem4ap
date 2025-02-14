@@ -5,3 +5,7 @@ indexes:
   - name: unitId
   - name: topicNumber
 
+- kind: Question
+  properties:
+  - name: assignmentType
+  - name: topicId

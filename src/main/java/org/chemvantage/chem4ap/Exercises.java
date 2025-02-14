@@ -9,7 +9,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Random;
 
-import com.google.gson.Gson;
+import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import com.googlecode.objectify.Key;
@@ -36,18 +36,22 @@ public class Exercises extends HttpServlet {
 		JsonObject responseJson = new JsonObject();
 
 		try {
-			String token = request.getHeader("Authorization");
-			if (token != null) token = token.substring(7);
+			String token = request.getHeader("Authorization").substring(7);
 			String sig = Util.isValid(token);
-
 			responseJson.addProperty("token", Util.getToken(sig));
-
+			
 			User user = User.getUser(sig);
-			responseJson.add("question",getNextQuestion(user));
-
+			JsonObject q = getNextQuestion(user);
+			if (q == null) throw new Exception("Unable to get a new question.");
+			responseJson.add("question",q);
 			out.println(responseJson.toString());
 		} catch (Exception e) {
-			response.sendError(401);	//responseJson.addProperty("error", "You must launch this app from the link inside your LMS.");
+			JsonObject question = new JsonObject();
+			question.addProperty("type", "true_false");
+			question.addProperty("id", "1");
+			question.addProperty("prompt", e.getMessage());
+			responseJson.add("question", question);
+			out.println(responseJson.toString());	
 		}
 	}
 	
@@ -57,19 +61,20 @@ public class Exercises extends HttpServlet {
 		PrintWriter out = response.getWriter();
 		
 		try {
-			String token = request.getHeader("Authorization");
-			if (token != null) token = token.substring(7);
+			String token = request.getHeader("Authorization").substring(7);
 			String sig = Util.isValid(token);
-
+			
 			BufferedReader reader = request.getReader();
 			JsonObject requestJson = JsonParser.parseReader(reader).getAsJsonObject();
 			
 			Long questionId = requestJson.get("id").getAsLong();
-			Long parameter = requestJson.get("parameter").getAsLong();
 			String studentAnswer = requestJson.get("answer").getAsString();
 			
 			Question q = getQuestion(questionId);
-			if (q.requiresParser()) q.setParameters(parameter);
+			if (q.requiresParser()) {
+				Integer parameter = requestJson.get("parameter").getAsInt();
+				q.setParameters(parameter);
+			}
 			
 			StringBuffer buf = new StringBuffer();
 			if (q.isCorrect(studentAnswer)) {
@@ -99,17 +104,38 @@ public class Exercises extends HttpServlet {
 		return q;
 	}
 	
-	JsonObject getNextQuestion(User user) {
+	JsonObject getNextQuestion(User user) throws Exception {
 		Question q = null;
 		Assignment a = getAssignment(user.getAssignmentId());
 		Key<Question> k = a.questionKeys.get(new Random().nextInt(a.questionKeys.size()));
+		if (k == null) return null;
+		
 		q = questionMap.get(k.getId());
 		if (q == null) {
 			q = ofy().load().key(k).now();
 			questionMap.put(k.getId(), q);
 		}
-		Gson gson = new Gson();
-		JsonObject j = JsonParser.parseString(gson.toJson(q)).getAsJsonObject();
+		if (q==null) return null;
+		
+		JsonObject j = new JsonObject();
+		
+		String prompt = q.prompt;
+		if (q.requiresParser()) {
+			Integer parameter = new Random().nextInt();
+			q.setParameters(parameter);
+			j.addProperty("parameter",parameter);
+			prompt = q.parseString(q.prompt);
+		}	
+		j.addProperty("id", q.id);
+		j.addProperty("type", q.type);
+		j.addProperty("prompt", prompt);
+		
+		if (q.units != null) j.addProperty("units", q.units);
+		if (q.choices != null) {
+			JsonArray choices = new JsonArray();
+			for (String c : q.choices) choices.add(c);
+			j.add("choices", choices);
+		}
 		return j;
 	}
 	

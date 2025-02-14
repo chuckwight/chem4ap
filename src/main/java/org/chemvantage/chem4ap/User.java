@@ -159,7 +159,7 @@ public class User {
 	}
 	
 	String getTokenSignature() {
-		if (this.isAnonymous()) return Long.toHexString(sig);
+		if (this.isAnonymous()) return String.valueOf(sig);
 		else {
 			if (sig==null) setToken();
 			return String.valueOf(sig);     // String version of @Id value of User in the datastore
@@ -184,7 +184,11 @@ public class User {
 				ofy().save().entity(user);
 			}
 			return user;
-		} catch (Exception e) {}
+		} catch (Exception e) {  // try to process an anonymous user
+			Long millis = Long.parseLong(sig);
+			Date exp = new Date(millis);
+			if (exp.after(now) && exp.before(expires)) return new User();
+		}
 		return null;   	
 	}
 
