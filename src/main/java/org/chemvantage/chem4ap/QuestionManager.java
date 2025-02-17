@@ -53,6 +53,7 @@ public class QuestionManager extends HttpServlet {
 				out.println(previewQuestion(request));
 				break;
 			default:
+				String assignmentType = request.getParameter("AssignmentType");
 				Long topicId = null;
 				Long unitId = null;
 				try {
@@ -65,7 +66,7 @@ public class QuestionManager extends HttpServlet {
 						unitId = topic.unitId;
 					}
 				} catch (Exception e) {}
-				out.println(viewQuestions(unitId,topicId));
+				out.println(viewQuestions(assignmentType,unitId,topicId));
 			}
 		} catch (Exception e) {
 			response.getWriter().println("Chem4AP Error: " + e.getMessage()==null?e.toString():e.getMessage());
@@ -192,7 +193,8 @@ public class QuestionManager extends HttpServlet {
 		
 		buf.append(q.printAll());
 		
-		buf.append("<INPUT TYPE=HIDDEN NAME=QuestionId VALUE=" + questionId + " />");
+		buf.append("<INPUT TYPE=HIDDEN NAME=QuestionId VALUE=" + questionId + " />"
+				+ "<input type=hidden name=AssignmentType value=" + q.assignmentType + " />");
 		buf.append("<INPUT TYPE=SUBMIT NAME=UserRequest VALUE='Delete Question' />");
 		buf.append("<INPUT TYPE=SUBMIT NAME=UserRequest VALUE='Quit' />");
 		
@@ -317,7 +319,8 @@ public class QuestionManager extends HttpServlet {
 			}
 			Question question = new Question(questionType);
 			buf.append("<p><FORM METHOD=POST ACTION=/questions>");
-			buf.append("<INPUT TYPE=HIDDEN NAME=QuestionType VALUE=" + questionType + " />");
+			buf.append("<input type=hidden name=AssignmentType value=" + request.getParameter("AssignmentType") + " />"
+					+ "<INPUT TYPE=HIDDEN NAME=QuestionType VALUE=" + questionType + " />");
 			buf.append("Topic: " + topic.title + "<br>"
 					+ "<input type=hidden name=TopicId value=" + topic.id + " />");
 			
@@ -331,11 +334,6 @@ public class QuestionManager extends HttpServlet {
 					+ "<input type=hidden name=TopicId value=" + topicId + " />"
 					+ "Select a question type: " + questionTypeDropDownBox("")
 					+ "<input type=submit value=Go /></form>");
-			buf.append("<form method=get>"
-					+ "<input type=hidden name=UserRequest value='NewJson' />"
-					+ "<input type=hidden name=TopicId value=" + topicId + " />"
-					+ "Paste a JSON string here: <input type=text name=json />"
-					+ "<input type=submit value=Go /></form>");
 			}
 		return buf.toString() + Util.foot();
 	}
@@ -343,7 +341,7 @@ public class QuestionManager extends HttpServlet {
 	String previewQuestion(HttpServletRequest request) {
 		StringBuffer buf = new StringBuffer(Util.head("Editor"));
 		try {
-			String assignmentType = request.getParameter("AssignmentTyoe");
+			String assignmentType = request.getParameter("AssignmentType");
 			long questionId = 0;
 			boolean current = false;
 			boolean proposed = false;
@@ -441,45 +439,77 @@ public class QuestionManager extends HttpServlet {
 		}
 	}
 
-	String viewQuestions(Long unitId, Long topicId) throws Exception {
+	String viewQuestions(String assignmentType,Long unitId, Long topicId) throws Exception {
 		StringBuffer buf = new StringBuffer(Util.head("Editor"));
 
 		buf.append("<h1>Manage Question Items</h1>");
 
 		//if (topicMap == null) refreshTopics();
 		refreshTopics();	
-		buf.append("<h2>Question Items</h2>\n"
-				+ "Select a unit and topic below to edit the associated questions.<p>\n");
-		String assignmentType = "Exercises";
-		// Make a drop-down selector for units
-		APChemUnit unit = unitId==null?null:ofy().load().type(APChemUnit.class).id(unitId).now();
-		buf.append("<form>"
-				+ "<input type=hidden name=UserRequest value=ViewQuestions />"
-				+ "<input type=radio name=AssignmentType value=Exercises checked />"
-				+ "<select name=UnitId onchange=submit()><option>Select a Unit</option>");
-		for (APChemUnit u : unitList) buf.append("<option value=" + u.id + (u.equals(unit)? " selected":"") + ">" + u.title + "</option>");
-		buf.append("</select>&nbsp;");
-
+		buf.append("<h2>Question Items</h2>");
+		APChemUnit unit = null;
 		APChemTopic topic = null;
-		if (unitId !=null) {
-			topicList = ofy().load().type(APChemTopic.class).filter("unitId",unit.id).order("topicNumber").list();
-			// Make a drop-down selector for units
-			topic = topicId==null?null:ofy().load().type(APChemTopic.class).id(topicId).now();
-			buf.append("<select name=TopicId onchange=submit()><option>Select a topic</option>");
-			for (APChemTopic t : topicList) buf.append("<option value=" + t.id + (t.equals(topic)? " selected":"") + ">" + t.title + "</option>");
-			buf.append("</select>"
-					+ "</form>");
-		}
 		
+		buf.append("<form><input type=hidden name=UserRequest value=ViewQuestions />");
+		
+		if (assignmentType == null) {
+			buf.append("<label><input type=radio required name=AssignmentType value=Exercises onClick=submit() />Exercises</label><br/>"
+					+ " <label><input type=radio required name=AssignmentType value=Homework onClick=submit() />Homework</label>");
+		} else {
+			buf.append("<h3>Exercises</h3>"
+					+ "<input type=hidden name=AssignmentType value=" + assignmentType + " />");
+
+			// Make a drop-down selector for units
+			unit = unitId==null?null:ofy().load().type(APChemUnit.class).id(unitId).now();
+			buf.append("<select name=UnitId onchange=submit()><option>Select a Unit</option>");
+			for (APChemUnit u : unitList) buf.append("<option value=" + u.id + (u.equals(unit)? " selected":"") + ">" + u.title + "</option>");
+			buf.append("</select>&nbsp;");
+
+			if (unitId !=null) {
+				topicList = ofy().load().type(APChemTopic.class).filter("unitId",unit.id).order("topicNumber").list();
+				// Make a drop-down selector for units
+				topic = topicId==null?null:ofy().load().type(APChemTopic.class).id(topicId).now();
+				buf.append("<select name=TopicId onchange=submit()><option>Select a topic</option>");
+				for (APChemTopic t : topicList) buf.append("<option value=" + t.id + (t.equals(topic)? " selected":"") + ">" + t.title + "</option>");
+				buf.append("</select>");
+			}
+		}
+		buf.append("</form>");
+
 		if (unit != null && topic != null) {  // display the questions
 			List<Question> questions = ofy().load().type(Question.class).filter("assignmentType",assignmentType).filter("topicId",topicId).list();
 			buf.append("This topic has " + questions.size() + " question items. ");
 			buf.append("<a href=/questions?UserRequest=NewQuestion&AssignmentType=" + assignmentType + "&TopicId=" + topic.id + ">Create a New Question</a><p>");	
+			buf.append("<form method=get>"
+					+ "<input type=hidden name=UserRequest value='NewJson' />"
+					+ "<input type=hidden name=AssignmentType value=" + assignmentType + " />"
+					+ "<input type=hidden name=TopicId value=" + topicId + " />"
+					+ "Paste a JSON string here: <input type=text name=json />"
+					+ "<input type=submit value=Go /></form>");
 			
+			buf.append("<table>");
 			for (Question q : questions) {
 				q.setParameters();
-				buf.append(q.printAll());
+				buf.append("<tr>"
+					+ "<td style='vertical-align: top;'><div style='display: inline'>"
+					+ "  <form method=post action=/questions>"
+					+ "    <input type=hidden name=QuestionId value=" + q.id + " />"
+					+ "    <input type=hidden name=UnitId value=" + unitId + " />"
+					+ "    <input type=hidden name=TopicId value=" + topicId + " />"
+					+ "    <input type=hidden name=AssignmentType value=" + assignmentType + " />"
+					+ "    <input type=hidden name=UserRequest value='Delete Question' /><br/>"
+					+ "    <input type=submit value=Delete />"
+					+ "  </form>&nbsp;"
+					+ "  <form method=get action=/questions>"
+					+ "    <input type=hidden name=QuestionId value=" + q.id + " />"
+					+ "    <input type=hidden name=UserRequest value=EditQuestion /><br/>"
+					+ "    <input type=submit value=Edit />"
+					+ "  </form></div>"
+					+ "</td>"
+					+ "<td>" + q.printAll() + "</td>"
+					+ "</tr>");
 			}
+			buf.append("</table>");
 		}
 		return buf.toString() + Util.foot();
 	}

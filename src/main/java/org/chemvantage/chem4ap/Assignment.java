@@ -23,7 +23,6 @@ import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
 
-import com.googlecode.objectify.Key;
 import com.googlecode.objectify.annotation.Entity;
 import com.googlecode.objectify.annotation.Id;
 import com.googlecode.objectify.annotation.Index;
@@ -42,7 +41,6 @@ public class Assignment implements java.lang.Cloneable {
 			String title;
 			Long unitId;
 			List<Long> topicIds = new ArrayList<Long>();
-			List<Key<Question>> questionKeys = new ArrayList<Key<Question>>();
 			
 	Assignment() {}
 	
@@ -54,7 +52,7 @@ public class Assignment implements java.lang.Cloneable {
 		this.created = new Date();
 		APChemUnit unit = ofy().load().type(APChemUnit.class).id(unitId).now();
 		this.topicIds = unit.topicIds;
-		for (Long id : topicIds) questionKeys.addAll(ofy().load().type(Question.class).filter("assignmentType", assignmentType).filter("topicId",id).keys().list());
+		//for (Long id : topicIds) questionKeys.addAll(ofy().load().type(Question.class).filter("assignmentType", assignmentType).filter("topicId",id).keys().list());
 	}
 
 	protected Assignment clone() throws CloneNotSupportedException {

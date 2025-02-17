@@ -50,9 +50,8 @@ public class Question implements Serializable, Cloneable {
 	@Id 	Long id;
 	@Index	Long topicId; 
 	@Index	String assignmentType;
-	@Index	int pointValue=1;
+	@Index	String type;
 			String prompt;
-			String type;
 			String correctAnswer;
 			String units;
 			List<String> choices = new ArrayList<String>();
@@ -70,8 +69,8 @@ public class Question implements Serializable, Cloneable {
 		this.type = type;
 		this.correctAnswer = "";
 		this.parameterString = "";
-		this.pointValue = 1;
 	}
+	
 
 	Question (long topicId,String prompt,String type,List<String> choices,
 			double requiredPrecision,int significantFigures,String correctAnswer,String units,int pointValue,String parameterString,
@@ -84,7 +83,7 @@ public class Question implements Serializable, Cloneable {
 		this.significantFigures = significantFigures;
 		this.correctAnswer = correctAnswer;
 		this.units = units;
-		this.pointValue = pointValue;
+	
 		this.parameterString = parameterString;
 	}
 
@@ -602,7 +601,7 @@ public class Question implements Serializable, Cloneable {
 			break;
 		case "numeric":
 			JsonElement unts = jq.get("units");
-			if (units != null) units = unts.getAsString();
+			if (unts != null) units = unts.getAsString();
 			break;
 		}
 		return edit();

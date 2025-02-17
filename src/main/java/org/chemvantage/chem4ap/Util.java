@@ -61,7 +61,7 @@ public class Util {
 	static String hashId(String userId) {
 		try {
 			MessageDigest md = MessageDigest.getInstance("SHA-256");
-        	byte[] bytes = md.digest((userId + System.getenv("SALT")).getBytes(StandardCharsets.UTF_8));
+        	byte[] bytes = md.digest((userId + Util.getSalt()).getBytes(StandardCharsets.UTF_8));
         	StringBuilder sb = new StringBuilder();
             for (byte b : bytes) {
                 sb.append(String.format("%02x", b));
