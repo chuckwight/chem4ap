@@ -9,3 +9,9 @@ indexes:
   properties:
   - name: assignmentType
   - name: topicId
+  
+- kind: Question
+  properties:
+  - name: assignmentType
+  - name: topicId
+  - name: type
