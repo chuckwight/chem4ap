@@ -6,7 +6,6 @@ import static com.googlecode.objectify.ObjectifyService.ofy;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.PrintWriter;
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -37,7 +36,12 @@ public class Exercises extends HttpServlet {
 		response.setContentType("application/json");
 
 		JsonObject responseJson = new JsonObject();
-
+		
+// Temporary fix:
+	List<Question> questions = ofy().load().type(Question.class).list();
+	ofy().save().entities(questions).now();
+// End
+	
 		try {
 			String token = request.getHeader("Authorization").substring(7);
 			String sig = Util.isValid(token);
@@ -62,7 +66,7 @@ public class Exercises extends HttpServlet {
 			throws ServletException, IOException {
 		response.setContentType("application/json");
 		PrintWriter out = response.getWriter();
-		
+		StringBuffer debug = new StringBuffer();
 		try {
 			String token = request.getHeader("Authorization").substring(7);
 			String sig = Util.isValid(token);
@@ -78,17 +82,23 @@ public class Exercises extends HttpServlet {
 				Integer parameter = requestJson.get("parameter").getAsInt();
 				q.setParameters(parameter);
 			}
+			debug.append("1");
 			
 			Score s = getScore(User.getUser(sig));
 			
 			StringBuffer buf = new StringBuffer();
 			if (q.isCorrect(studentAnswer)) {
+				debug.append("2a");
 				s.update(q,1);
+				debug.append("3");
 				buf.append("<h2>That's right! Your answer is correct.</h2>");
 			} else {
+				debug.append("2b");
 				s.update(q,0);
+				debug.append("3");
 				buf.append("<h2>Sorry, your answer is not correct</h2>The correct answer is: " + q.getCorrectAnswer());	
 			}
+			debug.append("4");
 			
 			JsonObject responseJson = new JsonObject();
 			responseJson.addProperty("token",Util.getToken(sig));
@@ -96,18 +106,18 @@ public class Exercises extends HttpServlet {
 			out.println(responseJson.toString());
 		} catch (Exception e) {
 			JsonObject err = new JsonObject();
-			err.addProperty("error", e.getMessage());
+			err.addProperty("error", e.getMessage()); // + debug.toString());
 			out.println(err);
 		}
 	}
 	
-	Score getScore(User user) {
+	Score getScore(User user) throws Exception {
 		Long assignmentId = user.getAssignmentId();
 		Assignment a = ofy().load().type(Assignment.class).id(assignmentId).now();
 		return getScore(user,a);
 	}
 	
-	Score getScore(User user, Assignment a) {
+	Score getScore(User user, Assignment a) throws Exception {
 		Key<User> k = key(user);
 		Score s = null;
 		try {
@@ -118,8 +128,6 @@ public class Exercises extends HttpServlet {
 			}
 		} catch (Exception e) {
 			s = new Score(user.hashedId,a);
-			s.currentQuestionId = getNewQuestionId(user,a,s);
-			s.nextQuestionId = getNewQuestionId(user,a,s);
 			scoresMap.put(user.hashedId, s);
 			ofy().save().entity(s).now();
 		}
@@ -145,57 +153,12 @@ public class Exercises extends HttpServlet {
 
 		if (q.units != null) j.addProperty("units", q.units);
 		if (q.choices != null) {
+			if (q.scrambleChoices) j.addProperty("scrambled", true);
 			JsonArray choices = new JsonArray();
 			for (String c : q.choices) choices.add(c);
 			j.add("choices", choices);
 		}
 		return j;
-	}
-	
-	Long getNewQuestionId(User user, Assignment a, Score s) {		
-		// Select a topic based on current topic scores
-		Long topicId = null;
-		if (!s.topicIds.equals(a.topicIds)) s.repairMe(a);
-		int range = 0;
-		Random random = new Random();
-		for (Long tId : a.topicIds) {
-			range += 100 - s.scores.get(tId);
-		}
-		int r = random.nextInt(range);
-		range = 0;
-		for (Long tId : a.topicIds) {
-			range += 100 - s.scores.get(tId);
-			if (r < range) {
-				topicId = tId;
-				break;
-			}
-		}
-		
-		// Gather question keys for types based on quartile score for the topic
-		// Quartile 1 gets TF & MC, Q2 gets MC & FB, Q3 gets FB & CB, Q4 gets CB & NU
-		int quartile = s.scores.get(topicId)/4 + 1;
-		List<Key<Question>> questionKeys = new ArrayList<Key<Question>>();
-		switch (quartile) {
-		case 1:
-			questionKeys.addAll(ofy().load().type(Question.class).filter("assignmentType","Exercises").filter("topicId",topicId).filter("type","true_false").keys().list());
-		case 2:
-			questionKeys.addAll(ofy().load().type(Question.class).filter("assignmentType","Exercises").filter("topicId",topicId).filter("type","multiple_choice").keys().list());
-			if (quartile == 1) break;
-		case 3:
-			questionKeys.addAll(ofy().load().type(Question.class).filter("assignmentType","Exercises").filter("topicId",topicId).filter("type","fill_in_blank").keys().list());
-			if (quartile == 2) break;
-		case 4:
-			questionKeys.addAll(ofy().load().type(Question.class).filter("assignmentType","Exercises").filter("topicId",topicId).filter("type","checkbox").keys().list());
-			if (quartile == 3) break;
-			questionKeys.addAll(ofy().load().type(Question.class).filter("assignmentType","Exercises").filter("topicId",topicId).filter("type","numeric").keys().list());
-		}
-		
-		// Eliminate any questions recently answered
-		questionKeys.removeAll(s.answeredQuestionKeys.get(topicId));
-		// Serlerct one key at random and convert it to a Long id
-		Long questionId = questionKeys.get(random.nextInt(questionKeys.size())).getId();
-		
-		return questionId;
 	}
 	
 	Assignment getAssignment(Long id) {

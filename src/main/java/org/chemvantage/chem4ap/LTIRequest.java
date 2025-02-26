@@ -36,14 +36,17 @@ import jakarta.servlet.http.HttpServletResponse;
 public class LTIRequest extends HttpServlet {
 
 	private static final long serialVersionUID = 137L;
-/*
+
 	@Override
 	public void doGet(HttpServletRequest request, HttpServletResponse response) 
 			throws IOException {
 		// Temporary hack for launching the SPA. Normally, this servlet does not accept GET requests
-			response.sendRedirect("/exercises/index.html?t=" + Util.getToken(new User().getTokenSignature()));
+			User user = new User("chemvantage.org","1");
+			user.setAssignment(5745753746046976L);
+			user.setToken();
+			response.sendRedirect("/exercises/index.html?t=" + Util.getToken(user.getTokenSignature()));
 		}
-*/	
+	
 	@Override
 	public void doPost(HttpServletRequest request, HttpServletResponse response) 
 			throws IOException {
