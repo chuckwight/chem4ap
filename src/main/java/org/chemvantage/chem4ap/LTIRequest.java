@@ -36,7 +36,7 @@ import jakarta.servlet.http.HttpServletResponse;
 public class LTIRequest extends HttpServlet {
 
 	private static final long serialVersionUID = 137L;
-
+/*
 	@Override
 	public void doGet(HttpServletRequest request, HttpServletResponse response) 
 			throws IOException {
@@ -46,7 +46,7 @@ public class LTIRequest extends HttpServlet {
 			user.setToken();
 			response.sendRedirect("/exercises/index.html?t=" + Util.getToken(user.getTokenSignature()));
 		}
-	
+*/	
 	@Override
 	public void doPost(HttpServletRequest request, HttpServletResponse response) 
 			throws IOException {

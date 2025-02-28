@@ -105,12 +105,12 @@ public class Exercises extends HttpServlet {
 	}
 	
 	Score getScore(User user, Assignment a) throws Exception {
-		Key<User> k = key(user);
 		Score s = null;
 		try {
 			s = scoresMap.get(user.hashedId);
 			if (s == null) {
-				s = ofy().load().type(Score.class).parent(k).id(user.getAssignmentId()).safe();
+				Key<Score> scoreKey = key(key(user), Score.class, a.id);
+				s = ofy().load().key(scoreKey).safe();
 				scoresMap.put(user.hashedId, s);
 			}
 		} catch (Exception e) {

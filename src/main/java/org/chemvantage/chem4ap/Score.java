@@ -59,7 +59,7 @@ public class Score {
 		Long topicId = q.topicId;
 		int index = topicIds.indexOf(topicId);
 		int quartile = scores.get(index)/25 + 1;
-		int n = 9;
+		int n = 11;
 		int proposedScore = (120*qScore + n*scores.get(index))/(n+1);
 		if (proposedScore > 100) proposedScore = 100;
 		int newQuartile = proposedScore/25 + 1;
