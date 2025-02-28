@@ -65,14 +65,17 @@ public class Score {
 		StringBuffer debug = new StringBuffer("Score.update");
 		try {
 		Long topicId = q.topicId;
-		int quartile = this.scores.get(topicId)/25 + 1;
-		int n = (21-3*quartile)/2; // averaging constant - range 9-4 
+		int quartile = scores.get(topicId)/25 + 1;
+		int n = 9;
 		int proposedScore = (120*qScore + n*scores.get(topicId))/(n+1);
 		if (proposedScore > 100) proposedScore = 100;
 		int newQuartile = proposedScore/25 + 1;
 		if (newQuartile < quartile) proposedScore = (quartile-1)*25;
 		scores.put(topicId,proposedScore);
+		
 		answeredQuestionKeys.add(key(q));
+		if (answeredQuestionKeys.size() > 5) answeredQuestionKeys.remove(0);
+	
 		currentQuestionId = nextQuestionId;
 		debug.append("i");
 		nextQuestionId = getNewQuestionId();
@@ -85,61 +88,58 @@ public class Score {
 	Long getNewQuestionId() throws Exception {
 		StringBuffer debug = new StringBuffer("NewQuestionId:");
 		try {
-		// Select a topic based on current topic scores
-		Long topicId = null;
-		int range = 0;
-		Random random = new Random();
-		for (Long tId : topicIds) {
-			range += 100 - scores.get(tId);
-		}
-		debug.append("range="+range);
-		int r = random.nextInt(range);
-		range = 0;
-		for (Long tId : topicIds) {
-			range += 100 - scores.get(tId);
-			if (r < range) {
-				topicId = tId;
-				break;
+			// Select a topic based on current topic scores
+			Long topicId = null;
+			int range = 0;
+			for (Long tId : topicIds) {
+				range += 100 - scores.get(tId);
 			}
-		}
-		debug.append(" topicId=" + topicId);
-		// Gather question keys for types based on quartile score for the topic
-		// Quartile 1 gets TF & MC, Q2 gets MC & FB, Q3 gets FB & CB, Q4 gets CB & NU
-		int score = scores.get(topicId);
-		int quartile = scores.get(topicId)/4 + 1;
-		debug.append(" score=" + score + " quartile=" + quartile);
-		List<Key<Question>> questionKeys = new ArrayList<Key<Question>>();
-		try {
-		switch (quartile) {
-		case 1:
-			questionKeys.addAll(ofy().load().type(Question.class).filter("assignmentType","Exercises").filter("topicId",topicId).filter("type","true_false").keys().list());
-		case 2:
-			questionKeys.addAll(ofy().load().type(Question.class).filter("assignmentType","Exercises").filter("topicId",topicId).filter("type","multiple_choice").keys().list());
-			if (quartile == 1) break;
-		case 3:
-			questionKeys.addAll(ofy().load().type(Question.class).filter("assignmentType","Exercises").filter("topicId",topicId).filter("type","fill_in_blank").keys().list());
-			if (quartile == 2) break;
-		case 4:
-			questionKeys.addAll(ofy().load().type(Question.class).filter("assignmentType","Exercises").filter("topicId",topicId).filter("type","checkbox").keys().list());
-			if (quartile == 3) break;
-			questionKeys.addAll(ofy().load().type(Question.class).filter("assignmentType","Exercises").filter("topicId",topicId).filter("type","numeric").keys().list());
-		}
-		debug.append(" keys=" + questionKeys.size());
-		
-		} catch (Exception e) {
-			debug.append("out");
-			questionKeys.addAll(ofy().load().type(Question.class).filter("assignmentType","Exercises").filter("topicId", topicId).keys().list());
-		}
-		// Eliminate any questions recently answered
-		questionKeys.removeAll(answeredQuestionKeys);
-		debug.append(" " + questionKeys.size() + " keys");
-		// Select one key at random and convert it to a Long id
-		Long questionId = questionKeys.get(random.nextInt(questionKeys.size())).getId();
-		return questionId;
+			Random random = new Random();
+			if (range > 0) {
+				int r = random.nextInt(range);
+				range = 0;
+				for (Long tId : topicIds) {
+					range += 100 - scores.get(tId);
+					if (r < range) {
+						topicId = tId;
+						break;
+					}
+				}
+			} else {
+				topicId = topicIds.get(random.nextInt(topicIds.size()));
+			}
+			
+			// Gather question keys for types based on quartile score for the topic
+			// Quartile 1 gets TF & MC, Q2 gets MC & FB, Q3 gets FB & CB, Q4 gets CB & NU
+			int quartile = scores.get(topicId)/25 + 1;
+			if (quartile > 4) quartile = 4;
+
+			List<Key<Question>> questionKeys = new ArrayList<Key<Question>>();
+			switch (quartile) {
+			case 1:
+				questionKeys.addAll(ofy().load().type(Question.class).filter("assignmentType","Exercises").filter("topicId",topicId).filter("type","true_false").keys().list());
+			case 2:
+				questionKeys.addAll(ofy().load().type(Question.class).filter("assignmentType","Exercises").filter("topicId",topicId).filter("type","multiple_choice").keys().list());
+				if (quartile == 1) break;
+			case 3:
+				questionKeys.addAll(ofy().load().type(Question.class).filter("assignmentType","Exercises").filter("topicId",topicId).filter("type","fill_in_blank").keys().list());
+				if (quartile == 2) break;
+			case 4:
+				questionKeys.addAll(ofy().load().type(Question.class).filter("assignmentType","Exercises").filter("topicId",topicId).filter("type","checkbox").keys().list());
+				if (quartile == 3) break;
+				questionKeys.addAll(ofy().load().type(Question.class).filter("assignmentType","Exercises").filter("topicId",topicId).filter("type","numeric").keys().list());
+			}
+
+			// Eliminate any questions recently answered
+			questionKeys.removeAll(answeredQuestionKeys);
+			
+			// Select one key at random and convert it to a Long id
+			Long questionId = questionKeys.get(random.nextInt(questionKeys.size())).getId();
+			return questionId;
 		} catch (Exception e) {
 			throw new Exception(e.getMessage() + debug.toString());
 		}
 	}
-	
+
 
 }

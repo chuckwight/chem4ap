@@ -7,7 +7,6 @@ import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.Random;
 
@@ -37,11 +36,6 @@ public class Exercises extends HttpServlet {
 
 		JsonObject responseJson = new JsonObject();
 		
-// Temporary fix:
-	List<Question> questions = ofy().load().type(Question.class).list();
-	ofy().save().entities(questions).now();
-// End
-	
 		try {
 			String token = request.getHeader("Authorization").substring(7);
 			String sig = Util.isValid(token);
@@ -85,20 +79,13 @@ public class Exercises extends HttpServlet {
 			debug.append("1");
 			
 			Score s = getScore(User.getUser(sig));
+			boolean correct = q.isCorrect(studentAnswer);
+			s.update(q, q.isCorrect(studentAnswer)?1:0);
 			
 			StringBuffer buf = new StringBuffer();
-			if (q.isCorrect(studentAnswer)) {
-				debug.append("2a");
-				s.update(q,1);
-				debug.append("3");
-				buf.append("<h2>That's right! Your answer is correct.</h2>");
-			} else {
-				debug.append("2b");
-				s.update(q,0);
-				debug.append("3");
-				buf.append("<h2>Sorry, your answer is not correct</h2>The correct answer is: " + q.getCorrectAnswer());	
-			}
-			debug.append("4");
+			buf.append(correct?"<h2>That's right! Your answer is correct.</h2>":
+				"<h2>Sorry, your answer is not correct</h2>The correct answer is " + q.getCorrectAnswer() + "<br/>");
+			buf.append("Your score on this assignment is " + s.getPctScore() + "%");
 			
 			JsonObject responseJson = new JsonObject();
 			responseJson.addProperty("token",Util.getToken(sig));
@@ -153,7 +140,7 @@ public class Exercises extends HttpServlet {
 
 		if (q.units != null) j.addProperty("units", q.units);
 		if (q.choices != null) {
-			if (q.scrambleChoices) j.addProperty("scrambled", true);
+			j.addProperty("scrambled", q.scrambleChoices);
 			JsonArray choices = new JsonArray();
 			for (String c : q.choices) choices.add(c);
 			j.add("choices", choices);
