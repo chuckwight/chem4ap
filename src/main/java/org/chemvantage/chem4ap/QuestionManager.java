@@ -478,28 +478,37 @@ public class QuestionManager extends HttpServlet {
 
 		if (unit != null && topic != null) {  // display the questions
 			List<Question> questions = ofy().load().type(Question.class).filter("assignmentType",assignmentType).filter("topicId",topicId).list();
-			buf.append("This topic has " + questions.size() + " question items. ");
-			buf.append("<a href=/questions?UserRequest=NewQuestion&AssignmentType=" + assignmentType + "&TopicId=" + topic.id + ">Create a New Question</a><p>");	
-			buf.append("<form method=get>"
+			buf.append("This topic has " + questions.size() + " question items.<br/>");
+			
+			buf.append("<a href=/questions?UserRequest=NewQuestion&AssignmentType=" + assignmentType + "&TopicId=" + topic.id + ">Create a New Question</a> ");	
+			buf.append("<form method=get style='display: inline;'>"
 					+ "<input type=hidden name=UserRequest value='NewJson' />"
 					+ "<input type=hidden name=AssignmentType value=" + assignmentType + " />"
 					+ "<input type=hidden name=TopicId value=" + topicId + " />"
-					+ "Paste a JSON string here: <input type=text name=json />"
+					+ "or paste a JSON string here: <input type=text name=json />"
 					+ "<input type=submit value=Go /></form>");
 			
 			buf.append("<table>");
+			
+			// Count the number of question of each type:
+			int tf = 0;
+			int mc = 0;
+			int fb = 0;
+			int cb = 0;
+			int nu = 0;
+			
 			for (Question q : questions) {
+				switch (q.type) {
+				case "true_false": tf++; break;
+				case "multiple_choice": mc++; break;
+				case "fill_in_blank": fb++; break;
+				case "checkbox": cb++; break;
+				case "numeric": nu++; break;
+				}
+				
 				q.setParameters();
 				buf.append("<tr>"
 					+ "<td style='vertical-align: top;'><div style='display: inline'>"
-					+ "  <form method=post action=/questions>"
-					+ "    <input type=hidden name=QuestionId value=" + q.id + " />"
-					+ "    <input type=hidden name=UnitId value=" + unitId + " />"
-					+ "    <input type=hidden name=TopicId value=" + topicId + " />"
-					+ "    <input type=hidden name=AssignmentType value=" + assignmentType + " />"
-					+ "    <input type=hidden name=UserRequest value='Delete Question' /><br/>"
-					+ "    <input type=submit value=Delete />"
-					+ "  </form>&nbsp;"
 					+ "  <form method=get action=/questions>"
 					+ "    <input type=hidden name=QuestionId value=" + q.id + " />"
 					+ "    <input type=hidden name=UserRequest value=EditQuestion /><br/>"
@@ -510,6 +519,8 @@ public class QuestionManager extends HttpServlet {
 					+ "</tr>");
 			}
 			buf.append("</table>");
+			
+			buf.append("Number of each type: TF-" + tf + " MC-" + mc + " FB-" + fb + " CB-" + cb + " NU-" + nu);
 		}
 		return buf.toString() + Util.foot();
 	}
