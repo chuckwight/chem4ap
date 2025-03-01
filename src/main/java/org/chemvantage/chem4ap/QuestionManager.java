@@ -508,12 +508,12 @@ public class QuestionManager extends HttpServlet {
 				
 				q.setParameters();
 				buf.append("<tr>"
-					+ "<td style='vertical-align: top;'><div style='display: inline'>"
+					+ "<td style='vertical-align: top;'>"
 					+ "  <form method=get action=/questions>"
 					+ "    <input type=hidden name=QuestionId value=" + q.id + " />"
 					+ "    <input type=hidden name=UserRequest value=EditQuestion /><br/>"
 					+ "    <input type=submit value=Edit />"
-					+ "  </form></div>"
+					+ "  </form>"
 					+ "</td>"
 					+ "<td>" + q.printAll() + "</td>"
 					+ "</tr>");
