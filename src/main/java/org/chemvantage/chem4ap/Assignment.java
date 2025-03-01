@@ -51,8 +51,10 @@ public class Assignment implements java.lang.Cloneable {
 		this.platform_deployment_id = platform_deployment_id;
 		this.created = new Date();
 		APChemUnit unit = ofy().load().type(APChemUnit.class).id(unitId).now();
-		this.topicIds = unit.topicIds;
-		//for (Long id : topicIds) questionKeys.addAll(ofy().load().type(Question.class).filter("assignmentType", assignmentType).filter("topicId",id).keys().list());
+		for (Long tId : unit.topicIds) {
+			int nQuestions = ofy().load().type(Question.class).filter("assignmentType","Exercises").filter("topicId",tId).count();
+			if (nQuestions >5) topicIds.add(tId);
+		}
 	}
 
 	protected Assignment clone() throws CloneNotSupportedException {

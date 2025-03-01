@@ -6,8 +6,6 @@ import static com.googlecode.objectify.ObjectifyService.ofy;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.PrintWriter;
-import java.util.HashMap;
-import java.util.Map;
 import java.util.Random;
 
 import com.google.gson.JsonArray;
@@ -24,9 +22,6 @@ import jakarta.servlet.http.HttpServletResponse;
 @WebServlet(urlPatterns={"/question","/answer"})
 public class Exercises extends HttpServlet {
 	private static final long serialVersionUID = 1L;
-	
-	private Map<Long,Assignment> assignmentMap = new HashMap<Long,Assignment>();
-	private Map<String,Score> scoresMap = new HashMap<String,Score>();
 	
 	protected void doGet(HttpServletRequest request, HttpServletResponse response) 
 			throws ServletException, IOException {
@@ -85,7 +80,7 @@ public class Exercises extends HttpServlet {
 			StringBuffer buf = new StringBuffer();
 			buf.append(correct?"<h2>That's right! Your answer is correct.</h2>":
 				"<h2>Sorry, your answer is not correct</h2>The correct answer is " + q.getCorrectAnswer() + "<br/>");
-			buf.append("Your score on this assignment is " + s.getPctScore() + "%");
+			buf.append("Your score on this assignment is " + s.totalScore + "%");
 			
 			JsonObject responseJson = new JsonObject();
 			responseJson.addProperty("token",Util.getToken(sig));
@@ -98,35 +93,11 @@ public class Exercises extends HttpServlet {
 		}
 	}
 	
-	Score getScore(User user) throws Exception {
-		Long assignmentId = user.getAssignmentId();
-		Assignment a = ofy().load().type(Assignment.class).id(assignmentId).now();
-		return getScore(user,a);
-	}
-	
-	Score getScore(User user, Assignment a) throws Exception {
-		Score s = null;
-		try {
-			s = scoresMap.get(user.hashedId);
-			if (s == null) {
-				Key<Score> scoreKey = key(key(user), Score.class, a.id);
-				s = ofy().load().key(scoreKey).safe();
-				scoresMap.put(user.hashedId, s);
-			}
-		} catch (Exception e) {
-			s = new Score(user.hashedId,a);
-			scoresMap.put(user.hashedId, s);
-			ofy().save().entity(s).now();
-		}
-		return s;
-	}
-
 	JsonObject getCurrentQuestion(User user) throws Exception {
-		Assignment a = getAssignment(user.getAssignmentId());
-		Score s = getScore(user,a);
+		Score s = getScore(user);
 		Question q = ofy().load().type(Question.class).id(s.currentQuestionId).safe();
 		JsonObject j = new JsonObject();
-
+	
 		String prompt = q.prompt;
 		if (q.requiresParser()) {
 			Integer parameter = new Random().nextInt();
@@ -137,7 +108,7 @@ public class Exercises extends HttpServlet {
 		j.addProperty("id", q.id);
 		j.addProperty("type", q.type);
 		j.addProperty("prompt", prompt);
-
+	
 		if (q.units != null) j.addProperty("units", q.units);
 		if (q.choices != null) {
 			j.addProperty("scrambled", q.scrambleChoices);
@@ -147,14 +118,23 @@ public class Exercises extends HttpServlet {
 		}
 		return j;
 	}
+
+	Score getScore(User user) throws Exception {
+		Assignment a = ofy().load().type(Assignment.class).id(user.getAssignmentId()).now();
+		return getScore(user,a);
+	}
 	
-	Assignment getAssignment(Long id) {
-		Assignment a = assignmentMap.get(id);
-		if (a == null) {
-			a = ofy().load().type(Assignment.class).id(id).now();
-			assignmentMap.put(id, a);
+	Score getScore(User user, Assignment a) throws Exception {
+		Score s = null;
+		Key<Score> scoreKey = key(key(user), Score.class, a.id);
+		try {
+			s = ofy().load().key(scoreKey).safe();
+			if (!s.topicIds.equals(a.topicIds)) s.repairMe(a); 
+		} catch (Exception e) {
+			s = new Score(user.hashedId,a);
+			ofy().save().entity(s).now();
 		}
-		return a;
+		return s;
 	}
 }
 
