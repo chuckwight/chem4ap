@@ -3,6 +3,7 @@ package org.chemvantage.chem4ap;
 import static com.googlecode.objectify.ObjectifyService.ofy;
 
 import java.io.IOException;
+import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.text.DecimalFormat;
@@ -13,6 +14,12 @@ import com.auth0.jwt.algorithms.Algorithm;
 import com.auth0.jwt.interfaces.DecodedJWT;
 import com.auth0.jwt.interfaces.JWTVerifier;
 import com.google.cloud.ServiceOptions;
+import com.google.cloud.tasks.v2.AppEngineHttpRequest;
+import com.google.cloud.tasks.v2.CloudTasksClient;
+import com.google.cloud.tasks.v2.HttpMethod;
+import com.google.cloud.tasks.v2.QueueName;
+import com.google.cloud.tasks.v2.Task;
+import com.google.protobuf.ByteString;
 import com.googlecode.objectify.annotation.Entity;
 import com.googlecode.objectify.annotation.Id;
 import com.googlecode.objectify.annotation.Ignore;
@@ -53,6 +60,37 @@ public class Util {
 		ofy().save().entity(u);
 	}
 
+	static void createTask(String relativeUri, String query)
+			throws IOException {
+		// This method accepts a relativeUri (e.g., /report) to POST a request to a Chem4AP servlet
+		String location = "us-central1";
+		String queueName = "default";
+		// Instantiates a client.
+		try (CloudTasksClient client = CloudTasksClient.create()) {
+			// Construct the fully qualified queue name.
+			String queuePath = QueueName.of(projectId, location, queueName).toString();
+
+			// Build the Task:
+			Task.Builder taskBuilder =
+					Task.newBuilder()
+					.setAppEngineHttpRequest(
+							AppEngineHttpRequest.newBuilder()
+							.setBody(ByteString.copyFrom(query, Charset.defaultCharset()))
+							.setRelativeUri(relativeUri)
+							.setHttpMethod(HttpMethod.POST)
+							.putHeaders("Content-Type", "application/x-www-form-urlencoded")
+							.build());
+/*
+			// Add the scheduled time to the request.
+			taskBuilder.setScheduleTime(
+					Timestamp.newBuilder()
+					.setSeconds(Instant.now(Clock.systemUTC()).plusSeconds(seconds).getEpochSecond()));
+*/
+			// Send create task request.
+			client.createTask(queuePath, taskBuilder.build());  // returns Task entity
+		}
+	}
+	
 	static double getAvgStars() {
 		DecimalFormat df2 = new DecimalFormat("#.#");
 		return Double.valueOf(df2.format(u.avgStars));

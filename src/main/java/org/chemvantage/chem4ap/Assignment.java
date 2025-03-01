@@ -30,12 +30,12 @@ import com.googlecode.objectify.annotation.Index;
 @Entity
 public class Assignment implements java.lang.Cloneable {
 	@Id 	Long id;
-	@Index	public String platform_deployment_id;
+	@Index	String platform_deployment_id;
 	@Index	String assignmentType;
 	@Index	String resourceLinkId;
 	@Index 	Date created;
-	@Index	public 	String lti_ags_lineitems_url;
-	@Index	public	String lti_ags_lineitem_url;
+	@Index	String lti_ags_lineitems_url;
+	@Index	String lti_ags_lineitem_url;
 	@Index	Date valid;
 			String lti_nrps_context_memberships_url;
 			String title;

@@ -17,16 +17,23 @@
 
 package org.chemvantage.chem4ap;
 
+import static com.googlecode.objectify.ObjectifyService.ofy;
+
 import java.io.BufferedReader;
 import java.io.DataOutputStream;
 import java.io.IOException;
 import java.io.InputStreamReader;
+import java.io.OutputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.net.URLEncoder;
+import java.sql.Timestamp;
+import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
 
 import com.auth0.jwt.JWT;
 import com.auth0.jwt.algorithms.Algorithm;
@@ -170,6 +177,97 @@ public class LTIMessage {  // utility for sending LTI-compliant "POX" or "REST+J
     	}
     	return null;
     }
+    
+	static String postUserScore(Score s, String userId) throws Exception {
+		// This method uses the LTIv1p3 message protocol to post a user's score to the LMS grade book.
+		// The lineitem URL corresponds to the LMS grade book column for the Assignment entity,
+		// and the specific cell is identified by the user_id value defined by the LMS platform
+
+		StringBuffer buf = new StringBuffer("PostUserScoreDebug:");
+		try {
+			Assignment a = ofy().load().type(Assignment.class).id(s.id).safe();
+			String scope = "https://purl.imsglobal.org/spec/lti-ags/scope/score";
+			buf.append("AssignmentId=" + (a==null?"unknown":a.id) + "<br/>");
+
+			String authToken = getAccessToken(a.platform_deployment_id,scope);
+			buf.append("AuthToken:" + authToken + "<br/>");
+
+			if (authToken.startsWith("Failed")) throw new Exception("Failed: could not get access token. " + authToken);
+			String bearerAuth = "Bearer " + authToken;
+			
+			String raw_id = userId.substring(userId.lastIndexOf("/")+1);
+			
+			SimpleDateFormat sdf2 = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSSXXX");
+			Timestamp timestamp = new Timestamp(new Date().getTime());
+			//String timestamp = ZonedDateTime.now(ZoneOffset.UTC).format());   //.format(DateTimeFormatter.ISO_OFFSET_DATE_TIME);
+
+			JsonObject j = new JsonObject();
+			j.addProperty("timestamp", sdf2.format(timestamp));
+			j.addProperty("scoreGiven", Double.valueOf(s.totalScore));
+			j.addProperty("scoreMaximum", 100);
+			j.addProperty("activityProgress", "Completed");
+			j.addProperty("gradingProgress", "FullyGraded");
+			j.addProperty("userId", raw_id);
+			String json = j.toString();
+
+			// append "/scores" to the lineitem URL, taking into account that the URL may have a query part (thank you, Moodle)
+			URL u = null;
+			int i = a.lti_ags_lineitem_url.indexOf("?")==-1?a.lti_ags_lineitem_url.length():a.lti_ags_lineitem_url.indexOf("?");
+			u = new URL(a.lti_ags_lineitem_url.substring(0,i) + "/scores" + a.lti_ags_lineitem_url.substring(i));
+
+			HttpURLConnection uc = (HttpURLConnection) u.openConnection();
+			uc.setRequestMethod("POST");
+			uc.setRequestProperty("Authorization", bearerAuth);
+			uc.setRequestProperty("Content-Type", "application/vnd.ims.lis.v1.score+json");
+			uc.setDoOutput(true);
+
+			// send the message
+			//OutputStreamWriter toTC = new OutputStreamWriter(uc.getOutputStream());
+			OutputStream os = uc.getOutputStream();
+			byte[] json_bytes = json.getBytes("utf-8");
+			os.write(json_bytes, 0, json_bytes.length);           
+			os.close();
+
+			int responseCode = uc.getResponseCode(); // success if 200-202
+			buf.append("Response Code = " + responseCode + "<br/>");
+
+			boolean success = responseCode>199 && responseCode<203;
+			if (success) {  
+				//s.lisReportComplete = true;
+				//ofy().save().entity(s);
+				buf.append("Success " + responseCode + "<br/>AuthToken: " + authToken + "<br/>JSON: " + json);
+				//sendEmailToAdmin("Score submission success",buf.toString());
+			} else if (responseCode==422) {
+				buf.append("Response code 422: This LMS does not allow LTI score submissions for instructors or test students.<br/>");
+				//Utilities.sendEmail("ChemVantage","admin@chemvantage.org","Score submission failed",buf.toString());
+			} else {			
+				buf.append(uc.getRequestMethod() + " " + u.toString() + "<br>"
+						+ "Content-Type: application/vnd.ims.lis.v1.score+json<br>"
+						+ "Authorization: " + bearerAuth + "<p>"
+						+ json + "<p>");
+				Map<String,List<String>> headers = uc.getHeaderFields();
+				for (Entry<String,List<String>> e : headers.entrySet()) {
+					buf.append(e.getKey() + ": ");
+					for (String es : e.getValue()) buf.append(es + " ");
+					buf.append("<br>");
+				}
+
+				BufferedReader reader = new BufferedReader(new InputStreamReader(uc.getErrorStream()));
+				String line;
+				while ((line = reader.readLine()) != null) {
+					buf.append(line);
+				}
+				reader.close();
+				//Utilities.sendEmail("ChemVantage","admin@chemvantage.org","Score submission failed",buf.toString());
+			}
+		}
+		catch (Exception e) {
+			Util.sendEmail("ChemVantage","admin@chemvantage.org","Score submission failed",buf.toString());
+		}
+		return buf.toString();
+	}
+	
+
 /*   
        static JsonObject getLineItem(Deployment d,String resourceLinkId,String lti_ags_lineitems_url) throws Exception {   	
     	String scope = "https://purl.imsglobal.org/spec/lti-ags/scope/lineitem";    	

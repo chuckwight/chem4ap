@@ -3,6 +3,7 @@ package org.chemvantage.chem4ap;
 import static com.googlecode.objectify.ObjectifyService.key;
 import static com.googlecode.objectify.ObjectifyService.ofy;
 
+import java.net.URLEncoder;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
@@ -17,6 +18,7 @@ public class Score {
 	@Id	Long id;  // assignmentId
 	@Parent Key<User> owner;
 	int totalScore = 0;
+	int maxScore = 0; // totalScore can decrease, so only report maxScore to the LMS
 	List<Long> topicIds = new ArrayList<Long>();
 	List<Integer> topicScores = new ArrayList<Integer>();  // each 0-100 in order of topicId
 	List<Key<Question>> recentQuestionKeys = new ArrayList<Key<Question>>();
@@ -81,6 +83,14 @@ public class Score {
 		// Select a new questionId
 		currentQuestionId = getNewQuestionId();
 		ofy().save().entity(this);
+		
+		// Create a Task to report the score to the LMS
+		if (totalScore > maxScore) { // only report if maxScore increases
+			maxScore = totalScore;
+			User user = ofy().load().key(owner).now();
+			String payload = "AssignmentId=" + id + "&UserId=" + URLEncoder.encode(user.getId(),"UTF-8");
+			Util.createTask("/report",payload);
+		}
 	}
 	
 	Long getNewQuestionId() throws Exception {
