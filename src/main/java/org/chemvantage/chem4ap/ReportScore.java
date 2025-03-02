@@ -51,10 +51,14 @@ public class ReportScore extends HttpServlet {
 		try {  // post single user score
 			response.setContentType("text/html");
 			PrintWriter out = response.getWriter();
+			
 			String userId = request.getParameter("UserId");
+			String hashedId = Util.hashId(userId);
+			
 			Long assignmentId = Long.parseLong(request.getParameter("AssignmentId"));
 			Assignment a = ofy().load().type(Assignment.class).id(assignmentId).safe();
-			Key<Score> scoreKey = key(key(User.class,userId), Score.class, a.id);
+			
+			Key<Score> scoreKey = key(key(User.class,hashedId), Score.class, a.id);
 			Score s = ofy().load().key(scoreKey).safe();
 			
 			if (a.lti_ags_lineitem_url != null && !a.lti_ags_lineitem_url.contains("localhost")) {  // use LTIAdvantage reporting specs
