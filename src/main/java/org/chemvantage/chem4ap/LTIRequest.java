@@ -79,7 +79,7 @@ public class LTIRequest extends HttpServlet {
 				if (state==null) throw new Exception("state parameter was missing"); 
 				validateStateToken(iss, state); // ensures proper OIDC authorization flow completed							
 				user = validateUserClaims(claims);
-				user.setToken();
+				//user.setToken();
 			}
 			
 			// request is for ResourceLink or DeepLinking?
@@ -99,6 +99,7 @@ public class LTIRequest extends HttpServlet {
 					out.println(deepLinkingResponseMessage(user,claims,iss,assignmentType,unitId));
 					break;
 				default:
+					user.setToken();
 					out.println(contentPickerForm(user,request,claims));
 				}
 				break;

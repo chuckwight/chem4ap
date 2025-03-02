@@ -73,9 +73,10 @@ public class Exercises extends HttpServlet {
 			}
 			debug.append("1");
 			
-			Score s = getScore(User.getUser(sig));
+			User user = User.getUser(sig);
+			Score s = getScore(user);
 			boolean correct = q.isCorrect(studentAnswer);
-			s.update(q, q.isCorrect(studentAnswer)?1:0);
+			s.update(user, q, correct?1:0);
 			
 			StringBuffer buf = new StringBuffer();
 			buf.append(correct?"<h2>That's right! Your answer is correct.</h2>":
@@ -126,7 +127,8 @@ public class Exercises extends HttpServlet {
 	
 	Score getScore(User user, Assignment a) throws Exception {
 		Score s = null;
-		Key<Score> scoreKey = key(key(user), Score.class, a.id);
+		Key<User> userKey = key(User.class, user.hashedId);
+		Key<Score> scoreKey = key(userKey, Score.class, a.id);
 		try {
 			s = ofy().load().key(scoreKey).safe();
 			if (!s.topicIds.equals(a.topicIds)) s.repairMe(a); 

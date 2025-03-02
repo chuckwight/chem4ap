@@ -52,7 +52,7 @@ public class Score {
 		ofy().save().entity(this).now();
 	}
 
-	void update(Question q, int qScore) throws Exception {
+	void update(User user, Question q, int qScore) throws Exception {
 		/* Algorithm for tracking topic scores and totalScore:
 		 * The totalScore is calculated as a running average
 		 *   totalScore = (120*qScore + 11*totalScore)/12;
@@ -82,15 +82,16 @@ public class Score {
 		
 		// Select a new questionId
 		currentQuestionId = getNewQuestionId();
-		ofy().save().entity(this);
 		
 		// Create a Task to report the score to the LMS
 		if (totalScore > maxScore) { // only report if maxScore increases
 			maxScore = totalScore;
-			User user = ofy().load().key(owner).now();
 			String payload = "AssignmentId=" + id + "&UserId=" + URLEncoder.encode(user.getId(),"UTF-8");
 			Util.createTask("/report",payload);
 		}
+		
+		ofy().save().entity(this).now();
+		
 	}
 	
 	Long getNewQuestionId() throws Exception {
