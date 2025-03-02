@@ -36,17 +36,7 @@ import jakarta.servlet.http.HttpServletResponse;
 public class LTIRequest extends HttpServlet {
 
 	private static final long serialVersionUID = 137L;
-/*
-	@Override
-	public void doGet(HttpServletRequest request, HttpServletResponse response) 
-			throws IOException {
-		// Temporary hack for launching the SPA. Normally, this servlet does not accept GET requests
-			User user = new User("chemvantage.org","1");
-			user.setAssignment(5745753746046976L);
-			user.setToken();
-			response.sendRedirect("/exercises/index.html?t=" + Util.getToken(user.getTokenSignature()));
-		}
-*/	
+	
 	@Override
 	public void doPost(HttpServletRequest request, HttpServletResponse response) 
 			throws IOException {
@@ -124,7 +114,7 @@ public class LTIRequest extends HttpServlet {
 		boolean acceptsLtiResourceLink = settings.get("accept_types").getAsJsonArray().contains(new JsonPrimitive("ltiResourceLink"));
 		if (!acceptsLtiResourceLink) throw new Exception("Deep Link request failed because platform does not accept new LtiResourceLinks.");
 		
-		buf.append("<h1>Chem4AP Assignment Setup</h1>");
+		buf.append(Util.banner);
 
 		buf.append("<form name=AssignmentForm action=/lti method=POST>");
 		buf.append("<input type=hidden name=id_token value='" + request.getParameter("id_token") + "' />");
@@ -134,16 +124,22 @@ public class LTIRequest extends HttpServlet {
 		String assignmentType = request.getParameter("AssignmentType");
 		if (assignmentType==null) assignmentType="";
 		
-		buf.append("<h2>Select the type of assignment to create:</h2>");
-		buf.append("<div><label><input type=radio name=AssignmentType required value='Exercises' />Exercises</label></div>"
-				+ "<div><label><input type=radio name=AssignmentType required value='Homework (coming soon)' />Homework</label></div>");
+		buf.append("<table><tr><td width=25%>"
+				+ "<label><input type=radio name=AssignmentType required value='Exercises' checked /><b>Exercises</b></label><br/>"
+				+ "<label><input type=radio name=AssignmentType required value='Homework (coming soon)' /><b>Homework</b></label>"
+				+ "</td><td>"
+				+ "<span id=exDescription>This is an adaptive, formative assignment that will help your students to prepare "
+				+ "for the AP Chemistry exam. Select one of the AP Chemistry units below. When you launch the assignment, you "
+				+ "will be able to customize the individual topics covered in the assignment."
+				+ "</span>"
+				+ "</td></tr></table>");
 		List<APChemUnit> units = null;
 		units = ofy().load().type(APChemUnit.class).order("unitNumber").list();
-		buf.append("<h2>Please select one of the AP Chemistry units below:</h2>");
+		buf.append("<br/><select name=UnitId required><option value=''>Select a unit</option>");
 		for (APChemUnit u : units) {
-			buf.append("<div><label><input type=radio name=UnitId required value=" + u.id + " />" + u.title + "</label></div>");
+			buf.append("<option value=" + u.id + ">" + u.title + "</option>");
 		}
-		buf.append("<br/>");
+		buf.append("</select>");
 		buf.append("<input type=submit value='Create this assignment' />");
 
 		buf.append(Util.foot());
@@ -253,16 +249,14 @@ public class LTIRequest extends HttpServlet {
 			jwt = String.format("%s.%s", jwt, sig);
 			
 			// Create a form to be auto-submitted to the platform by the user_agent browser
-			
-			buf.append(Util.banner
-					+ "<h2>A new assignment is being created in your course.</h2>"
-					+ "When you launch it, you will be given an opportunity to customize it by "
-					+ "selecting the question to be presented or changing the default settings.<br/>"
-					+ "Send questions or comments to admin@chemvantage.org<br/><br/>");
 			buf.append("<form id=selections method=POST action='" + deep_link_return_url + "'>"
+					+ Util.banner + "<h1>Success!</h1>"
 					+ "<input type=hidden name=JWT value='" + jwt + "' />"
 					+ "<input type=submit value='Continue' />"
-					+ "</form><br/><br/>");
+					+ "</form>"
+					+ "<script>"
+					+ "document.getElementById('selections').submit();"
+					+ "</script>");
 		} catch (Exception e) {
 			buf.append(e.getMessage()==null?e.toString():e.getMessage() + "Debug: " + debug.toString());
 		}

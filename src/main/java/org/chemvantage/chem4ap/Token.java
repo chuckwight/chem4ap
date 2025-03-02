@@ -94,12 +94,8 @@ public class Token extends HttpServlet {
 			PrintWriter out = response.getWriter();
 			StringBuffer buf = new StringBuffer();
 			buf.append(Util.head("Auth Token"));
-			int nonceHash = nonce.hashCode();
 			// Javascript tries to store the hashCode of nonce for use during launch:
 			buf.append("<script>"
-					+ "try {"
-					+ " window.sessionStorage.setItem('sig','" + nonceHash + "');"
-					+ "} catch (error) {}"
 					+ "window.location.replace('" + oidc_auth_url + "');"
 					+ "</script>");
 			buf.append(Util.foot());
