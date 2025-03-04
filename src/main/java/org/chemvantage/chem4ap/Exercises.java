@@ -6,6 +6,7 @@ import static com.googlecode.objectify.ObjectifyService.ofy;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.PrintWriter;
+import java.util.Map;
 import java.util.Random;
 
 import com.google.gson.JsonArray;
@@ -32,15 +33,30 @@ public class Exercises extends HttpServlet {
 		JsonObject responseJson = new JsonObject();
 		
 		try {
-			String token = request.getHeader("Authorization").substring(7);
-			String sig = Util.isValid(token);
-			responseJson.addProperty("token", Util.getToken(sig));
+			String userRequest = request.getParameter("UserRequest");
+			if (userRequest == null) userRequest = "";
 			
-			User user = User.getUser(sig);
-			JsonObject q = getCurrentQuestion(user);
-			if (q == null) throw new Exception("Unable to get a new question.");
-			responseJson.add("question",q);
-			out.println(responseJson.toString());
+			switch (userRequest) {
+			case "SelectTopics":
+				response.setContentType("text/html");
+				out.println(viewTopicSelectForm(request));
+				break;
+			case "ReviewScores":
+				response.setContentType("text/html");
+				out.println(reviewScores(request));
+				break;
+			default:
+				response.setContentType("application/json");
+				String token = request.getHeader("Authorization").substring(7);
+				String sig = Util.isValid(token);
+				responseJson.addProperty("token", Util.getToken(sig));
+
+				User user = User.getUser(sig);
+				JsonObject q = getCurrentQuestion(user);
+				if (q == null) throw new Exception("Unable to get a new question.");
+				responseJson.add("question",q);
+				out.println(responseJson.toString());
+			}
 		} catch (Exception e) {
 			JsonObject question = new JsonObject();
 			question.addProperty("type", "true_false");
@@ -138,5 +154,61 @@ public class Exercises extends HttpServlet {
 		}
 		return s;
 	}
+	
+	static String instructorPage(User user, Assignment a) {
+		StringBuffer buf = new StringBuffer(Util.head("Instructor Page"));
+		
+		buf.append(Util.banner + "<h1>Exercises - Instructor Page</h1>"
+				+ "This is a formative, adaptive assignment that will help your students "
+				+ "prepare for the AP Chemistry Exam. It is a series of questions and numeric "
+				+ "problems drawn from the topics below that gradually increase in difficulty."
+				+ "<ul>"
+				+ "<li>Formative - students may work as many problems as necessary to "
+				+ "achieve a score of 100%. The correct answer is provided after each "
+				+ "submission, allowing students to learn as they work.</li>"
+				+ "<li>Adaptive - the assignment provides a personalized learning experience "
+				+ "by tailoring the questions to each student's needs based on their prior "
+				+ "responses.</li>"
+				+ "</ul>"
+				+ "The assignment is currently configured to cover the following topics listed"
+				+ "in the <a href=https://apcentral.collegeboard.org/courses/ap-chemistry>"
+				+ "AP Chemistry Course and Exam description</a>."
+				+ "You may add or delete topics to suit the current needs of your class."
+				+ "<h2>Topics Covered</h2>");
+		
+		Map<Long,APChemTopic> topics = ofy().load().type(APChemTopic.class).ids(a.topicIds);
+		buf.append("<ul>");
+		for (Long tId : a.topicIds) buf.append("<li>" + topics.get(tId).title + "</li>");
+		buf.append("</ul>");
+		
+		buf.append("<a href=/exercises?UserRequest=SelectTopics&sig=" + user.getTokenSignature() 
+				+ ">Customize the topics covered by this assignment</a><p>");
+		buf.append("<a href=/exercises?UserRequest=ReviewScores&sig=" + user.getTokenSignature()
+				+ ">Review your students' scores on this assignment</a><p>");
+		buf.append("<a href='/exercises?sig=" + user.getTokenSignature() + "' class='btn'>View This Assignment</a><p>");
+		
+		return buf.toString() + Util.foot();
+	}
+	
+	String viewTopicSelectForm(HttpServletRequest request) {
+		StringBuffer buf = new StringBuffer(Util.head("Select Topics"));
+		buf.append("<h1>Select Topics for This Assignment</h1>");
+		
+		User user = User.getUser(request.getParameter("sig"));
+		if (!user.isInstructor()) return null;
+		
+		return buf.toString() + Util.foot();
+	}
+		
+	String reviewScores(HttpServletRequest request) {
+		StringBuffer buf = new StringBuffer(Util.head("Review Scores"));
+		buf.append("<h1>Student Scores for This Assignment</h1>");
+		
+		User user = User.getUser(request.getParameter("sig"));
+		if (!user.isInstructor()) return null;
+		
+		return buf.toString() + Util.foot();
+	}
+	
 }
 

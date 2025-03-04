@@ -97,7 +97,11 @@ public class LTIRequest extends HttpServlet {
 				Assignment a = getMyAssignment(user,claims,d,request);
 				if (a==null) throw new Exception("Assignnent is null");
 				user.setAssignment(a.id);
-				response.sendRedirect(Util.getServerUrl() + "/exercises/index.html?t=" + Util.getToken(user.getTokenSignature()));
+				if (user.isInstructor()) {
+					out.println(Exercises.instructorPage(user,a));
+				} else {
+					response.sendRedirect(Util.getServerUrl() + "/exercises/index.html?t=" + Util.getToken(user.getTokenSignature()));
+				}
 				break;
 			default: throw new Exception("The LTI message_type claim " + message_type.getAsString() + " is not supported.");
 			}						
