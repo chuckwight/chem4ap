@@ -118,15 +118,16 @@ public class Util {
 				+ "  <meta name='description' content='Chem4AP is an LTI app for teaching and learning AP Chemistry.' />\n"
 				+ "  <meta http-equiv='Cache-Control' content='no-cache, no-store, must-revalidate' />\n"
 				+ "  <link rel='icon' href='images/logo.png' />\n"
-			//	+ "  <link rel='canonical' href='https://sage.chemvantage.org' />\n"
+				+ "  <link rel='canonical' href='https://www.chem4ap.com' />\n"
 				+ "  <title>Chem4P" + (title==null?"":" | " + title) + "</title>\n"
+				+ "  <!-- Font Family -->\n"
 				+ "  <link href='https://fonts.googleapis.com/css2?family=Poppins:wght@100;200;300;400;500;600;700;800;900&family=Shantell+Sans:wght@300;400;500;600;700;800&display=swap' rel='stylesheet'/>\n"
-			//	+ "  <link rel='stylesheet' href='/css/style.css'>\n"
-				+ "  <!-- Google tag (gtag.js) --> "
-				+ "  <script async src=\"https://www.googletagmanager.com/gtag/js?id=AW-942360432\"></script> "
-				+ "  <script> window.dataLayer = window.dataLayer || []; function gtag(){dataLayer.push(arguments);} gtag('js', new Date()); gtag('config', 'AW-942360432'); </script>"
+				+ "  <link rel='stylesheet' href='https://cdn.jsdelivr.net/npm/bootstrap@4.3.1/dist/css/bootstrap.min.css' integrity='sha384-ggOyR0iXCbMQv3Xipma34MD+dH/1fQ784/j6cY/iJTQUOhcWr7x9JvoRxT2MZw1T' crossorigin='anonymous'>"
+				//+ "  <!-- Google tag (gtag.js) --> "
+				//+ "  <script async src=\"https://www.googletagmanager.com/gtag/js?id=AW-942360432\"></script> "
+				//+ "  <script> window.dataLayer = window.dataLayer || []; function gtag(){dataLayer.push(arguments);} gtag('js', new Date()); gtag('config', 'AW-942360432'); </script>"
 				+ "</head>\n"
-				+ "<body>\n";
+				+ "<body style='margin: 20px; font-family: Poppins'>\n";
 	}
 	
 	static String foot() {

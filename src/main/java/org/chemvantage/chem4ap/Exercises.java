@@ -6,6 +6,7 @@ import static com.googlecode.objectify.ObjectifyService.ofy;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.PrintWriter;
+import java.util.List;
 import java.util.Map;
 import java.util.Random;
 
@@ -37,6 +38,10 @@ public class Exercises extends HttpServlet {
 			if (userRequest == null) userRequest = "";
 			
 			switch (userRequest) {
+			case "InstructorPage":
+				response.setContentType("text/html");
+				out.println(instructorPage(request));
+				break;
 			case "SelectTopics":
 				response.setContentType("text/html");
 				out.println(viewTopicSelectForm(request));
@@ -155,7 +160,15 @@ public class Exercises extends HttpServlet {
 		return s;
 	}
 	
-	static String instructorPage(User user, Assignment a) {
+	String instructorPage(HttpServletRequest request) throws Exception {
+		User user = User.getUser(request.getParameter("sig"));
+		Assignment a = ofy().load().type(Assignment.class).id(user.getAssignmentId()).safe();
+		return instructorPage(user,a);
+	}
+	
+	static String instructorPage(User user, Assignment a) throws Exception {
+		if (!user.isInstructor()) throw new Exception("Unauthorized");
+		
 		StringBuffer buf = new StringBuffer(Util.head("Instructor Page"));
 		
 		buf.append(Util.banner + "<h1>Exercises - Instructor Page</h1>"
@@ -170,33 +183,94 @@ public class Exercises extends HttpServlet {
 				+ "by tailoring the questions to each student's needs based on their prior "
 				+ "responses.</li>"
 				+ "</ul>"
-				+ "The assignment is currently configured to cover the following topics listed"
-				+ "in the <a href=https://apcentral.collegeboard.org/courses/ap-chemistry>"
-				+ "AP Chemistry Course and Exam description</a>."
-				+ "You may add or delete topics to suit the current needs of your class."
-				+ "<h2>Topics Covered</h2>");
+				+ "<h2>Topics Covered</h2>"
+				+ "This assignment covers the following "
+				+ "<a href=https://apcentral.collegeboard.org/courses/ap-chemistry target=_blank>"
+				+ "AP Chemistry</a> topics:");
 		
 		Map<Long,APChemTopic> topics = ofy().load().type(APChemTopic.class).ids(a.topicIds);
 		buf.append("<ul>");
 		for (Long tId : a.topicIds) buf.append("<li>" + topics.get(tId).title + "</li>");
-		buf.append("</ul>");
+		buf.append("</ul>"
+				+ "You may "
+				+ "<a href=/exercises?UserRequest=SelectTopics&sig=" + user.getTokenSignature() + ">"
+				+ "add or delete topics</a> to suit the current needs of your class.<p>");
 		
-		buf.append("<a href=/exercises?UserRequest=SelectTopics&sig=" + user.getTokenSignature() 
-				+ ">Customize the topics covered by this assignment</a><p>");
 		buf.append("<a href=/exercises?UserRequest=ReviewScores&sig=" + user.getTokenSignature()
 				+ ">Review your students' scores on this assignment</a><p>");
-		buf.append("<a href='/exercises?sig=" + user.getTokenSignature() + "' class='btn'>View This Assignment</a><p>");
+		
+		buf.append("<a class='btn btn-primary' href='/exercises/index.html?t=" + Util.getToken(user.getTokenSignature()) + "'>"
+				+ "View This Assignment</a><p>");
 		
 		return buf.toString() + Util.foot();
 	}
 	
-	String viewTopicSelectForm(HttpServletRequest request) {
+	String viewTopicSelectForm(HttpServletRequest request) throws Exception {
 		StringBuffer buf = new StringBuffer(Util.head("Select Topics"));
-		buf.append("<h1>Select Topics for This Assignment</h1>");
+		buf.append(Util.banner + "<h1>Select Topics for This Assignment</h1>");
 		
 		User user = User.getUser(request.getParameter("sig"));
 		if (!user.isInstructor()) return null;
 		
+		Assignment a = ofy().load().type(Assignment.class).id(user.getAssignmentId()).safe();
+		
+		buf.append("<form id=container method=post>"
+				+ "<input type=submit class='btn btn-primary' value='Click here to assign the topics selected below' /> "
+				+ "<a class='btn btn-primary' href=/exercises?UserRequest=InstructorPage&sig=" + user.getTokenSignature() + ">Quit</a><br/><br/>"
+				+ "<ul style='list-style: none;'>");
+		
+		List<APChemUnit> units = ofy().load().type(APChemUnit.class).order("unitNumber").list();
+		for (APChemUnit u : units) {
+			buf.append("<li><label><input type=checkbox class=unitCheckbox id=" + u.id 
+					+ " value=" + u.id + " onclick=unitClicked('" + u.id + "');"
+					+ " /> <b>Unit " + u.unitNumber + " - " + u.title + "</b></label></li>");
+			buf.append("<ul style='list-style: none;'>");
+			List<APChemTopic> topics = ofy().load().type(APChemTopic.class).filter("unitId",u.id).order("topicNumber").list();
+			for(APChemTopic t : topics) {
+				buf.append("<li class='list" + u.id + "'>"
+						+ "<label><input type=checkbox class=unit" + u.id 
+						+ " name=TopicId value=" + t.id + " " 
+						+ (a.topicIds.contains(t.id)?"checked":"")
+						+ " onclick=topicClicked('" + u.id + "')"
+						+ " /> " + t.title + "</label>"
+						+ "</li>");
+			}
+			buf.append("</ul>"); // topic loop
+		}
+		
+		buf.append("</ul></form>");  // unit loop; container
+		buf.append("\n<script>"  // this script sets up the initial condition for 2-level selectors
+				+ "var unitBoxes = document.querySelectorAll('input.unitCheckbox');"
+				+ "var topicBoxes, checkall, checkedCount;"
+				+ "for (var i=0;i<unitBoxes.length;i++) {\n"
+				+ "  topicBoxes = document.querySelectorAll('input.unit' + unitBoxes[i].id);"
+				+ "  checkAll = document.getElementById(unitBoxes[i].id);"
+				+ "  checkedCount = document.querySelectorAll('input.unit' + unitBoxes[i].id + ':checked').length;"
+				+ "  checkAll.checked = checkedCount>0;"
+				+ "  checkAll.indeterminate = checkedCount>0 && checkedCount<topicBoxes.length;"
+				+ "  var listItems = document.querySelectorAll('li.list' + unitBoxes[i].id);"
+				+ "  for (var j=0;j<listItems.length;j++) listItems[j].style='display:' + (checkedCount>0?'list-item':'none');"
+				+ "}"
+				+ "function topicClicked(unitId) {"
+				+ "  var topicCount = document.querySelectorAll('input.unit' + unitId).length;"
+				+ "  var checkedCount = document.querySelectorAll('input.unit' + unitId + ':checked').length;"
+				+ "  var checkAll = document.getElementById(unitId);"
+				+ "  console.log('checked: ' + checkedCount + ' of ' + topicCount);"
+				+ "  checkAll.checked = checkedCount>0;"
+				+ "  checkAll.indeterminate = checkedCount>0 && checkedCount<topicCount;"
+				+ "  if (checkedCount==0) {"
+				+ "    var listItems = document.querySelectorAll('li.list' + unitId);"
+				+ "    for (var j=0;j<listItems.length;j++) listItems[j].style='display:none';"
+				+ "  }"
+				+ "}"
+				+ "function unitClicked(unitId) {"
+				+ "  var unitBox = document.getElementById(unitId);"
+				+ "  var listItems = document.querySelectorAll('li.list' + unitId);"
+				+ "  var topicBoxes = document.querySelectorAll('input.unit' + unitId);"
+				+ "  for (var i=0;i<topicBoxes.length;i++) topicBoxes[i].checked = unitBox.checked;"
+				+ "  for (var j=0;j<listItems.length;j++) listItems[j].style='display:' + (unitBox.checked?'list-item':'none');"
+				+ "}"
+				+ "</script>");
 		return buf.toString() + Util.foot();
 	}
 		
