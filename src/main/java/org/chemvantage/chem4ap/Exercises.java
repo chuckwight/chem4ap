@@ -6,6 +6,7 @@ import static com.googlecode.objectify.ObjectifyService.ofy;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.PrintWriter;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
@@ -52,7 +53,9 @@ public class Exercises extends HttpServlet {
 				break;
 			default:
 				response.setContentType("application/json");
-				String token = request.getHeader("Authorization").substring(7);
+				String authHeader = request.getHeader("Authorization");
+				if (authHeader == null) throw new Exception("Unauthorized. You must launch this app from the link inside your LMS.");
+				String token = authHeader.substring(7);
 				String sig = Util.isValid(token);
 				responseJson.addProperty("token", Util.getToken(sig));
 
@@ -76,38 +79,18 @@ public class Exercises extends HttpServlet {
 			throws ServletException, IOException {
 		response.setContentType("application/json");
 		PrintWriter out = response.getWriter();
-		StringBuffer debug = new StringBuffer();
 		try {
-			String token = request.getHeader("Authorization").substring(7);
-			String sig = Util.isValid(token);
+			String userRequest = request.getParameter("UserRequest");
+			if (userRequest == null) userRequest = "";
 			
-			BufferedReader reader = request.getReader();
-			JsonObject requestJson = JsonParser.parseReader(reader).getAsJsonObject();
-			
-			Long questionId = requestJson.get("id").getAsLong();
-			String studentAnswer = requestJson.get("answer").getAsString();
-			
-			Question q = ofy().load().type(Question.class).id(questionId).safe();
-			if (q.requiresParser()) {
-				Integer parameter = requestJson.get("parameter").getAsInt();
-				q.setParameters(parameter);
+			switch (userRequest) {
+			case "AssignTopics":
+				response.setContentType("text/html");
+				out.println(assignTopics(request));
+				break;
+			default:
+				out.println(getResponseJson(request).toString());
 			}
-			debug.append("1");
-			
-			User user = User.getUser(sig);
-			Score s = getScore(user);
-			boolean correct = q.isCorrect(studentAnswer);
-			s.update(user, q, correct?1:0);
-			
-			StringBuffer buf = new StringBuffer();
-			buf.append(correct?"<h2>That's right! Your answer is correct.</h2>":
-				"<h2>Sorry, your answer is not correct</h2>The correct answer is " + q.getCorrectAnswer() + "<br/>");
-			buf.append("Your score on this assignment is " + s.totalScore + "%");
-			
-			JsonObject responseJson = new JsonObject();
-			responseJson.addProperty("token",Util.getToken(sig));
-			responseJson.addProperty("html", buf.toString());
-			out.println(responseJson.toString());
 		} catch (Exception e) {
 			JsonObject err = new JsonObject();
 			err.addProperty("error", e.getMessage()); // + debug.toString());
@@ -115,6 +98,20 @@ public class Exercises extends HttpServlet {
 		}
 	}
 	
+	String assignTopics(HttpServletRequest request) throws Exception {
+		String sig = request.getParameter("sig");
+		User user = User.getUser(sig);
+		if (!user.isInstructor()) throw new Exception("Unauthorized");
+		Assignment a = ofy().load().type(Assignment.class).id(user.getAssignmentId()).safe();
+		String[] topicIds = request.getParameterValues("TopicId");
+		if (topicIds != null) {
+			a.topicIds = new ArrayList<Long>();
+			for (String tId : topicIds) a.topicIds.add(Long.parseLong(tId));
+			ofy().save().entity(a).now();
+		}
+		return instructorPage(user,a);
+	}
+
 	JsonObject getCurrentQuestion(User user) throws Exception {
 		Score s = getScore(user);
 		Question q = ofy().load().type(Question.class).id(s.currentQuestionId).safe();
@@ -139,6 +136,43 @@ public class Exercises extends HttpServlet {
 			j.add("choices", choices);
 		}
 		return j;
+	}
+	
+	JsonObject getResponseJson(HttpServletRequest request) throws Exception {
+		String authHeader = request.getHeader("Authorization");
+		if (authHeader == null) throw new Exception("Unauthorized. You must launch this app from the link inside your LMS.");
+		String token = authHeader.substring(7);
+		String sig = Util.isValid(token);
+		
+		BufferedReader reader = request.getReader();
+		JsonObject requestJson = JsonParser.parseReader(reader).getAsJsonObject();
+		
+		Long questionId = requestJson.get("id").getAsLong();
+		String studentAnswer = requestJson.get("answer").getAsString();
+		
+		Question q = ofy().load().type(Question.class).id(questionId).safe();
+		if (q.requiresParser()) {
+			Integer parameter = requestJson.get("parameter").getAsInt();
+			q.setParameters(parameter);
+		}
+		
+		User user = User.getUser(sig);
+		Score s = getScore(user);
+		boolean correct = q.isCorrect(studentAnswer);
+		s.update(user, q, correct?1:0);
+		
+		StringBuffer buf = new StringBuffer();
+		buf.append(correct?"<h2>That's right! Your answer is correct.</h2>":
+			"<h2>Sorry, your answer is not correct</h2>The correct answer is " 
+				+ q.getCorrectAnswer()
+				+ (q.units == null?"":" " + q.units)
+				+ "<br/>"
+				+ "Your score on this assignment is " + s.totalScore + "%");
+		
+		JsonObject responseJson = new JsonObject();
+		responseJson.addProperty("token",Util.getToken(sig));
+		responseJson.addProperty("html", buf.toString());
+		return responseJson;
 	}
 
 	Score getScore(User user) throws Exception {
@@ -214,8 +248,10 @@ public class Exercises extends HttpServlet {
 		
 		Assignment a = ofy().load().type(Assignment.class).id(user.getAssignmentId()).safe();
 		
-		buf.append("<form id=container method=post>"
-				+ "<input type=submit class='btn btn-primary' value='Click here to assign the topics selected below' /> "
+		buf.append("<form method=post action=/exercises>"
+				+ "<input type=hidden name=sig value=" + user.getTokenSignature() + " />"
+				+ "<input type=hidden name=UserRequest value=AssignTopics />"
+				+ "<input type=submit class='btn btn-primary' value='Click here to assign the topics selected below.' /> "
 				+ "<a class='btn btn-primary' href=/exercises?UserRequest=InstructorPage&sig=" + user.getTokenSignature() + ">Quit</a><br/><br/>"
 				+ "<ul style='list-style: none;'>");
 		
@@ -238,7 +274,11 @@ public class Exercises extends HttpServlet {
 			buf.append("</ul>"); // topic loop
 		}
 		
-		buf.append("</ul></form>");  // unit loop; container
+		buf.append("</ul>"  // unit loop
+				+ "<input type=submit class='btn btn-primary' value='Click here to assign the topics selected above.' /> "
+				+ "<a class='btn btn-primary' href=/exercises?UserRequest=InstructorPage&sig=" + user.getTokenSignature() + ">Quit</a><br/>"
+				+ "</form>");
+		
 		buf.append("\n<script>"  // this script sets up the initial condition for 2-level selectors
 				+ "var unitBoxes = document.querySelectorAll('input.unitCheckbox');"
 				+ "var topicBoxes, checkall, checkedCount;"
