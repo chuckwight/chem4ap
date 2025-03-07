@@ -6,7 +6,10 @@ import static com.googlecode.objectify.ObjectifyService.ofy;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.PrintWriter;
+import java.net.URLEncoder;
 import java.util.ArrayList;
+import java.util.Date;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
@@ -88,6 +91,10 @@ public class Exercises extends HttpServlet {
 				response.setContentType("text/html");
 				out.println(assignTopics(request));
 				break;
+			case "SynchronizeScores":
+				response.setContentType("text/html");
+				out.println(synchronizeScores(request));
+				break;
 			default:
 				out.println(getResponseJson(request).toString());
 			}
@@ -163,11 +170,13 @@ public class Exercises extends HttpServlet {
 		
 		StringBuffer buf = new StringBuffer();
 		buf.append(correct?"<h2>That's right! Your answer is correct.</h2>":
-			"<h2>Sorry, your answer is not correct</h2>The correct answer is " 
+			"<h2>Sorry, your answer is not correct</h2>"
+				+ "The correct answer is " 
 				+ q.getCorrectAnswer()
 				+ (q.units == null?"":" " + q.units)
-				+ "<br/>"
-				+ "Your score on this assignment is " + s.totalScore + "%");
+				+ "<br/>");
+		
+		buf.append("Your score on this assignment is " + s.totalScore + "%");
 		
 		JsonObject responseJson = new JsonObject();
 		responseJson.addProperty("token",Util.getToken(sig));
@@ -217,7 +226,11 @@ public class Exercises extends HttpServlet {
 				+ "by tailoring the questions to each student's needs based on their prior "
 				+ "responses.</li>"
 				+ "</ul>"
-				+ "<h2>Topics Covered</h2>"
+				+ "<a href=/exercises?UserRequest=ReviewScores&sig=" + user.getTokenSignature()
+				+ ">Review your students' scores on this assignment</a><p>");
+
+
+		buf.append("<h2>Topics Covered</h2>"
 				+ "This assignment covers the following "
 				+ "<a href=https://apcentral.collegeboard.org/courses/ap-chemistry target=_blank>"
 				+ "AP Chemistry</a> topics:");
@@ -228,10 +241,7 @@ public class Exercises extends HttpServlet {
 		buf.append("</ul>"
 				+ "You may "
 				+ "<a href=/exercises?UserRequest=SelectTopics&sig=" + user.getTokenSignature() + ">"
-				+ "add or delete topics</a> to suit the current needs of your class.<p>");
-		
-		buf.append("<a href=/exercises?UserRequest=ReviewScores&sig=" + user.getTokenSignature()
-				+ ">Review your students' scores on this assignment</a><p>");
+				+ "add or delete topics</a> to suit the current needs of your class.<br/><br/>");
 		
 		buf.append("<a class='btn btn-primary' href='/exercises/index.html?t=" + Util.getToken(user.getTokenSignature()) + "'>"
 				+ "View This Assignment</a><p>");
@@ -307,22 +317,120 @@ public class Exercises extends HttpServlet {
 				+ "  var unitBox = document.getElementById(unitId);"
 				+ "  var listItems = document.querySelectorAll('li.list' + unitId);"
 				+ "  var topicBoxes = document.querySelectorAll('input.unit' + unitId);"
-				+ "  for (var i=0;i<topicBoxes.length;i++) topicBoxes[i].checked = unitBox.checked;"
-				+ "  for (var j=0;j<listItems.length;j++) listItems[j].style='display:' + (unitBox.checked?'list-item':'none');"
+				+ "  for (var i=0;i<topicBoxes.length;i++) {"
+				+ "    topicBoxes[i].checked = unitBox.checked;"
+				+ "    listItems[i].style='display:list-item';"
+				+ "  }"
 				+ "}"
 				+ "</script>");
 		return buf.toString() + Util.foot();
 	}
-		
-	String reviewScores(HttpServletRequest request) {
+	
+	String reviewScores(HttpServletRequest request) throws Exception {
 		StringBuffer buf = new StringBuffer(Util.head("Review Scores"));
-		buf.append("<h1>Student Scores for This Assignment</h1>");
+		buf.append(Util.banner + "<h1>Scores for This Assignment</h1>");
 		
 		User user = User.getUser(request.getParameter("sig"));
 		if (!user.isInstructor()) return null;
 		
-		return buf.toString() + Util.foot();
+		Assignment a = ofy().load().type(Assignment.class).id(user.getAssignmentId()).safe();
+		
+		buf.append("<h2>" + (a.title==null?"":a.title) + "</h2>");
+		buf.append("Valid: " + new Date() + "<p>");
+		
+		try {
+			if (a.lti_nrps_context_memberships_url==null) throw new Exception("No Names and Roles Provisioning support.");
+
+			buf.append("The roster below is obtained using the Names and Role Provisioning service offered by your learning management system, "
+					+ "and may or may not include user's names or emails, depending on the settings of your LMS.<p>"
+					+ "<a href=/exercises?UserRequest=InstructorPage&sig=" + user.getTokenSignature() + ">Return to the instructor page</a><br/><br/>");
+
+			Map<String,String> scores = LTIMessage.readMembershipScores(a);
+			if (scores==null) scores = new HashMap<String,String>();  // in case service call fails
+
+			Map<String,String[]> membership = LTIMessage.getMembership(a);
+			if (membership==null) membership = new HashMap<String,String[]>(); // in case service call fails
+
+			Map<String,Key<Score>> keys = new HashMap<String,Key<Score>>();
+			Deployment d = ofy().load().type(Deployment.class).id(a.platform_deployment_id).safe();
+			String platform_id = d.getPlatformId() + "/";
+			for (String id : membership.keySet()) {
+				keys.put(id,key(key(User.class,Util.hashId(platform_id+id)),Score.class,a.id));
+			}
+			Map<Key<Score>,Score> cvScores = ofy().load().keys(keys.values());
+			buf.append("<table><tr><th>&nbsp;</th><th>Name</th><th>Email</th><th>Role</th><th>LMS Score</th><th>CV Score</th></tr>");
+			int i=0;
+			boolean synched = true;
+			for (Map.Entry<String,String[]> entry : membership.entrySet()) {
+				if (entry == null) continue;
+				String s = scores.get(entry.getKey());
+				Score cvScore = cvScores.get(keys.get(entry.getKey()));
+				i++;
+				buf.append("<tr><td>" + i + ".&nbsp;</td>"
+						+ "<td>" + entry.getValue()[1] + "</td>"
+						+ "<td>" + entry.getValue()[2] + "</td>"
+						+ "<td>" + entry.getValue()[0] + "</td>"
+						+ "<td align=center>" + (s == null?" - ":s + "%") + "</td>"
+						+ "<td align=center>" + (cvScore == null?" - ":String.valueOf(cvScore.maxScore) + "%") + "</td>"
+						+ "</tr>");
+				// Flag this score set as unsynchronizde only if there is one or more non-null ChemVantage Learner score that is not equal to the LMS score
+				// Ignore Instructor scores because the LMS often does not report them, and ignore null cvScore entities because they cannot be reported.
+				synched = synched && 
+						(!"Learner".equals(entry.getValue()[0]) || 
+						(cvScore==null?true:Double.valueOf(cvScore.maxScore).equals(Double.parseDouble(s))));
+			}
+			buf.append("</table><br/>");
+			if (!synched) {
+				buf.append("If any of the Learner scores above are not synchronized, you may use the button below to launch a background task " 
+						+ "where ChemVantage will resubmit them to your LMS. This can take several seconds to minutes depending on the "
+						+ "number of scores to process. Please note that you may have to adjust the settings in your LMS to accept the "
+						+ "revised scores. For example, in Canvas you may need to change the assignment settings to Unlimited Submissions. "
+						+ "This may also cause the submission to be counted as late if the LMS assignment deadline has passed.<br/>"
+						+ "<form method=post action=/exercises >"
+						+ "<input type=hidden name=sig value=" + user.getTokenSignature() + " />"
+						+ "<input type=hidden name=UserRequest value='SynchronizeScores' />"
+						+ "<input id=syncsubmit type=submit class='btn btn-primary' value='Synchronize Scores' "
+						+ "onclick=document.getElementById('syncsubmit').style='display:none'; />"
+						+ "</form>");
+			}
+			return buf.toString();
+		} catch (Exception e) {
+			buf.append(e.toString());
+		}
+		return buf.toString();		
 	}
 	
+	String synchronizeScores(HttpServletRequest request) throws Exception {
+		// This method looks for assignment scores that are different from the LMS scores and resubmits the score to the LMS
+		String sig = request.getParameter("sig");
+		User user = User.getUser(sig);
+		Assignment a = ofy().load().type(Assignment.class).id(user.getAssignmentId()).safe();
+
+		if (!user.isInstructor()) throw new Exception("Unauthorized.");  // only instructors can use this function
+		if (a==null) throw new Exception();  // can only do this for a known assignment
+		if (a.lti_ags_lineitem_url == null || a.lti_nrps_context_memberships_url == null) throw new Exception("Error: Your LMS is not configured for this operation."); // need both of these to work
+
+		Map<String,String> scores = LTIMessage.readMembershipScores(a);
+		if (scores==null || scores.size()==0) throw new Exception();  // this only works if we can get info from the LMS
+		Map<String,String[]> membership = LTIMessage.getMembership(a);
+		if (membership==null || membership.size()==0) throw new Exception();  // there must be some members of this class
+		Map<String,Key<Score>> keys = new HashMap<String,Key<Score>>();
+		Deployment d = ofy().load().type(Deployment.class).id(a.platform_deployment_id).safe();
+		String platform_id = d.getPlatformId() + "/";
+		for (String id : membership.keySet()) {
+			String hashedUserId = Util.hashId(platform_id + id);
+			keys.put(id,key(key(User.class,hashedUserId),Score.class,a.id));
+		}
+		Map<Key<Score>,Score> cvScores = ofy().load().keys(keys.values());
+		for (Map.Entry<String,String[]> entry : membership.entrySet()) {
+			if (entry == null) continue;
+			Score cvScore = cvScores.get(keys.get(entry.getKey()));
+			if (cvScore==null) continue;
+			String s = scores.get(entry.getKey());
+			if (String.valueOf(cvScore.maxScore).equals(s)) continue;  // the scores match (good!)
+			Util.createTask("/report","AssignmentId=" + a.id + "&UserId=" + URLEncoder.encode(platform_id + entry.getKey(),"UTF-8"));
+		}
+		return instructorPage(user,a);
+	}
 }
 

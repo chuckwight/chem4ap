@@ -31,12 +31,15 @@ import java.sql.Timestamp;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 
 import com.auth0.jwt.JWT;
 import com.auth0.jwt.algorithms.Algorithm;
+import com.google.gson.JsonArray;
+import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 
@@ -178,7 +181,76 @@ public class LTIMessage {  // utility for sending LTI-compliant "POX" or "REST+J
     	return null;
     }
     
-	static String postUserScore(Score s, String userId) throws Exception {
+    static Map<String,String[]> getMembership(Assignment a) {
+    	// This method uses the LTIv1p3 message protocol to retrieve the group membership from the LMS.
+    	// If this service is offered by providing the endpoint, the Json array MUST contain the user_id and roles
+    	// values, but may also include other fields such as name, given_name, middle_name, family_name, email, ...
+    	Map<String,String[]> membership = new HashMap<String,String[]>();
+    	String bearerAuth = null;
+
+    	try {
+    		String scope = "https://purl.imsglobal.org/spec/lti-nrps/scope/contextmembership.readonly";
+    		if ((bearerAuth=getAccessToken(a.platform_deployment_id,scope)).startsWith("response")) throw new Exception("the LMS failed to issue an auth token: " + bearerAuth);
+    		else bearerAuth = "Bearer " + bearerAuth;
+
+    		if (a.lti_nrps_context_memberships_url==null) throw new Exception("the service endpoint URL for this group is unknown");
+
+    		String next_url = a.lti_nrps_context_memberships_url;
+
+    		while (next_url != null) {
+    			URL u = new URL(next_url);
+    			HttpURLConnection uc = (HttpURLConnection) u.openConnection();
+    			//uc.setDoOutput(true);
+    			uc.setDoInput(true);
+    			uc.setRequestMethod("GET");
+    			uc.setRequestProperty("Authorization", bearerAuth);
+    			uc.setRequestProperty("Accept", "application/vnd.ims.lti-nrps.v2.membershipcontainer+json");
+    			uc.connect();
+
+    			int responseCode = uc.getResponseCode();
+    			if (responseCode > 199 && responseCode < 203) { // OK
+    				BufferedReader reader = new BufferedReader(new InputStreamReader(uc.getInputStream()));
+    				JsonObject json = JsonParser.parseReader(reader).getAsJsonObject();
+    				reader.close();
+
+    				JsonArray members = json.get("members").getAsJsonArray();
+    				Iterator<JsonElement> iterator = members.iterator();
+    				while(iterator.hasNext()){
+    					JsonObject member = iterator.next().getAsJsonObject();
+    					String user_id = member.get("user_id").getAsString();
+    					//String roles = member.get("roles").getAsString().toLowerCase();
+    					String roles = member.get("roles").getAsJsonArray().toString().toLowerCase();
+    					String role = roles.contains("administrator")?"Administrator":roles.contains("instructor")?"Instructor":"Learner";
+    					String name = "";
+    					try {
+    						name = member.get("name").getAsString();
+    					} catch (Exception e) {
+    						try {
+    							name = member.get("family_name").getAsString() + ", " + member.get("given_name").getAsString();
+    						} catch (Exception e2) {
+    						}
+    					}
+    					String email = "";
+    					try {
+    						email = member.get("email").getAsString();
+    					} catch (Exception e) {
+    					}
+    					String[] properties = {role, name, email};
+    					membership.put(user_id,properties);
+    				}
+    			} else return null; 
+    			next_url = null;
+    			try {  // per LTI NPRS specs, this section looks for a HttpLink to the next page of results
+    				String[] links = uc.getHeaderField("Link").split(",");  // splits comma-separated list of Links
+    				for (String l : links) if (l.contains("next")) next_url = l.substring(l.indexOf("<")+1,l.indexOf(">")); // url is enclosed in <>
+    			} catch (Exception e2) {}
+    		}
+    	} catch (Exception e) {	
+    	}
+    	return membership;
+    }
+
+    static String postUserScore(Score s, String userId) throws Exception {
 		// This method uses the LTIv1p3 message protocol to post a user's score to the LMS grade book.
 		// The lineitem URL corresponds to the LMS grade book column for the Assignment entity,
 		// and the specific cell is identified by the user_id value defined by the LMS platform
@@ -203,7 +275,7 @@ public class LTIMessage {  // utility for sending LTI-compliant "POX" or "REST+J
 
 			JsonObject j = new JsonObject();
 			j.addProperty("timestamp", sdf2.format(timestamp));
-			j.addProperty("scoreGiven", Double.valueOf(s.totalScore));
+			j.addProperty("scoreGiven", Double.valueOf(s.maxScore));
 			j.addProperty("scoreMaximum", 100);
 			j.addProperty("activityProgress", "Completed");
 			j.addProperty("gradingProgress", "FullyGraded");
@@ -267,6 +339,65 @@ public class LTIMessage {  // utility for sending LTI-compliant "POX" or "REST+J
 		return buf.toString();
 	}
 	
+	static Map<String,String> readMembershipScores(Assignment a) {
+		// This method uses the LTIv1p3 message protocol to retrieve a JSON containing all of
+		// the existing  scores for one assignment from the LMS. 
+		// The lineitem URL corresponds to the LMS grade book column fpr the Assignment entity.
+		
+		// Construct the deployment_id because we may need to strip this from the userId values
+		
+		Map<String,String> scores = new HashMap<String,String>();		
+		
+		try {		
+			String scope = "https://purl.imsglobal.org/spec/lti-ags/scope/result.readonly";
+			String bearerAuth = "Bearer " + getAccessToken(a.platform_deployment_id,scope);
+
+			if (a.lti_ags_lineitem_url==null) throw new Exception("the lineitem URL for this assignment is unknown");
+			
+			// calculate the index of the position between the path and query parts of the URL
+			int beginQuery = a.lti_ags_lineitem_url.indexOf("?");
+			if (beginQuery == -1) beginQuery = a.lti_ags_lineitem_url.length();  // end of the path (no query)
+			
+			// append "/results" to the path and reassemble the URL
+			String next_url = a.lti_ags_lineitem_url.substring(0,beginQuery) + "/results" + a.lti_ags_lineitem_url.substring(beginQuery);
+			
+			URL u = null;
+			while (next_url != null) {
+				u = new URL(next_url);
+
+				HttpURLConnection uc = (HttpURLConnection) u.openConnection();
+				uc.setDoInput(true);
+				uc.setRequestMethod("GET");
+				uc.setRequestProperty("Authorization", bearerAuth);
+				uc.setRequestProperty("Accept", "application/vnd.ims.lis.v2.resultcontainer+json");
+				uc.connect();
+
+				int responseCode = uc.getResponseCode();
+				if (responseCode > 199 && responseCode < 203) {  // OK
+					BufferedReader reader = new BufferedReader(new InputStreamReader(uc.getInputStream()));
+					JsonArray json = JsonParser.parseReader(reader).getAsJsonArray();
+					reader.close();
+
+					Iterator<JsonElement> iterator = json.iterator();
+					while(iterator.hasNext()) {
+						JsonObject result = iterator.next().getAsJsonObject();
+						String userId = result.get("userId").getAsString();
+						scores.put(userId,String.valueOf(Math.round(1000.*result.get("resultScore").getAsDouble()/result.get("resultMaximum").getAsDouble())/10.));
+					}
+				}
+				next_url = null;
+				try {  // per LTI AGS specs, this section looks for a HttpLink to the next page of results
+					String[] links = uc.getHeaderField("Link").split(",");  // splits comma-separated list of Links
+					for (String l : links) if (l.contains("next")) next_url = l.substring(l.indexOf("<")+1,l.indexOf(">")); // url is enclosed in <>
+				} catch (Exception e2) {}
+				uc.disconnect();
+			}
+		} catch (Exception e) {	
+			scores.put("Error", e.getMessage()==null?e.toString():e.getMessage());
+		}
+		return scores;
+	}
+
 
 /*   
        static JsonObject getLineItem(Deployment d,String resourceLinkId,String lti_ags_lineitems_url) throws Exception {   	
@@ -424,65 +555,6 @@ public class LTIMessage {  // utility for sending LTI-compliant "POX" or "REST+J
 		} catch (Exception e) {
 			return null;  //e.toString() + " " + e.getMessage() + "<br>" + debug.toString();
 		}
-	}
-
-	static Map<String,String> readMembershipScores(Assignment a) {
-		// This method uses the LTIv1p3 message protocol to retrieve a JSON containing all of
-		// the existing  scores for one assignment from the LMS. 
-		// The lineitem URL corresponds to the LMS grade book column fpr the Assignment entity.
-		
-		// Construct the deployment_id because we may need to strip this from the userId values
-		
-		Map<String,String> scores = new HashMap<String,String>();		
-		
-		try {		
-			String scope = "https://purl.imsglobal.org/spec/lti-ags/scope/result.readonly";
-			String bearerAuth = "Bearer " + getAccessToken(a.domain,scope);
-
-			if (a.lti_ags_lineitem_url==null) throw new Exception("the lineitem URL for this assignment is unknown");
-			
-			// calculate the index of the position between the path and query parts of the URL
-			int beginQuery = a.lti_ags_lineitem_url.indexOf("?");
-			if (beginQuery == -1) beginQuery = a.lti_ags_lineitem_url.length();  // end of the path (no query)
-			
-			// append "/results" to the path and reassemble the URL
-			String next_url = a.lti_ags_lineitem_url.substring(0,beginQuery) + "/results" + a.lti_ags_lineitem_url.substring(beginQuery);
-			
-			URL u = null;
-			while (next_url != null) {
-				u = new URL(next_url);
-
-				HttpURLConnection uc = (HttpURLConnection) u.openConnection();
-				uc.setDoInput(true);
-				uc.setRequestMethod("GET");
-				uc.setRequestProperty("Authorization", bearerAuth);
-				uc.setRequestProperty("Accept", "application/vnd.ims.lis.v2.resultcontainer+json");
-				uc.connect();
-
-				int responseCode = uc.getResponseCode();
-				if (responseCode > 199 && responseCode < 203) {  // OK
-					BufferedReader reader = new BufferedReader(new InputStreamReader(uc.getInputStream()));
-					JsonArray json = JsonParser.parseReader(reader).getAsJsonArray();
-					reader.close();
-
-					Iterator<JsonElement> iterator = json.iterator();
-					while(iterator.hasNext()) {
-						JsonObject result = iterator.next().getAsJsonObject();
-						String userId = result.get("userId").getAsString();
-						scores.put(userId,String.valueOf(Math.round(1000.*result.get("resultScore").getAsDouble()/result.get("resultMaximum").getAsDouble())/10.));
-					}
-				}
-				next_url = null;
-				try {  // per LTI AGS specs, this section looks for a HttpLink to the next page of results
-					String[] links = uc.getHeaderField("Link").split(",");  // splits comma-separated list of Links
-					for (String l : links) if (l.contains("next")) next_url = l.substring(l.indexOf("<")+1,l.indexOf(">")); // url is enclosed in <>
-				} catch (Exception e2) {}
-				uc.disconnect();
-			}
-		} catch (Exception e) {	
-			scores.put("Error", e.getMessage()==null?e.toString():e.getMessage());
-		}
-		return scores;
 	}
 
 	static String readUserScore(Assignment a, String userId) {
@@ -702,73 +774,5 @@ public class LTIMessage {  // utility for sending LTI-compliant "POX" or "REST+J
 		return membershipContainer;
 	}
 	
-	static Map<String,String[]> getMembership(Assignment a) {
-		// This method uses the LTIv1p3 message protocol to retrieve the group membership from the LMS.
-		// If this service is offered by providing the endpoint, the Json array MUST contain the user_id and roles
-		// values, but may also include other fields such as name, given_name, middle_name, family_name, email, ...
-		Map<String,String[]> membership = new HashMap<String,String[]>();
-		String bearerAuth = null;
-		
-		try {
-			String scope = "https://purl.imsglobal.org/spec/lti-nrps/scope/contextmembership.readonly";
-			if ((bearerAuth=getAccessToken(a.domain,scope)).startsWith("response")) throw new Exception("the LMS failed to issue an auth token: " + bearerAuth);
-			else bearerAuth = "Bearer " + bearerAuth;
-			
-			if (a.lti_nrps_context_memberships_url==null) throw new Exception("the service endpoint URL for this group is unknown");
-			
-			String next_url = a.lti_nrps_context_memberships_url;
-    		
-			while (next_url != null) {
-				URL u = new URL(next_url);
-				HttpURLConnection uc = (HttpURLConnection) u.openConnection();
-				//uc.setDoOutput(true);
-				uc.setDoInput(true);
-				uc.setRequestMethod("GET");
-				uc.setRequestProperty("Authorization", bearerAuth);
-				uc.setRequestProperty("Accept", "application/vnd.ims.lti-nrps.v2.membershipcontainer+json");
-				uc.connect();
-
-				int responseCode = uc.getResponseCode();
-				if (responseCode > 199 && responseCode < 203) { // OK
-					BufferedReader reader = new BufferedReader(new InputStreamReader(uc.getInputStream()));
-					JsonObject json = JsonParser.parseReader(reader).getAsJsonObject();
-					reader.close();
-
-					JsonArray members = json.get("members").getAsJsonArray();
-					Iterator<JsonElement> iterator = members.iterator();
-					while(iterator.hasNext()){
-						JsonObject member = iterator.next().getAsJsonObject();
-						String user_id = member.get("user_id").getAsString();
-						//String roles = member.get("roles").getAsString().toLowerCase();
-						String roles = member.get("roles").getAsJsonArray().toString().toLowerCase();
-						String role = roles.contains("administrator")?"Administrator":roles.contains("instructor")?"Instructor":"Learner";
-						String name = "";
-						try {
-							name = member.get("name").getAsString();
-						} catch (Exception e) {
-							try {
-								name = member.get("family_name").getAsString() + ", " + member.get("given_name").getAsString();
-							} catch (Exception e2) {
-							}
-						}
-						String email = "";
-						try {
-							email = member.get("email").getAsString();
-						} catch (Exception e) {
-						}
-						String[] properties = {role, name, email};
-						membership.put(user_id,properties);
-					}
-				} else return null; 
-				next_url = null;
-				try {  // per LTI NPRS specs, this section looks for a HttpLink to the next page of results
-					String[] links = uc.getHeaderField("Link").split(",");  // splits comma-separated list of Links
-					for (String l : links) if (l.contains("next")) next_url = l.substring(l.indexOf("<")+1,l.indexOf(">")); // url is enclosed in <>
-				} catch (Exception e2) {}
-			}
-		} catch (Exception e) {	
-			}
-			return membership;
-		}
 */
 }
