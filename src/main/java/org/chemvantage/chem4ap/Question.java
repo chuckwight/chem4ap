@@ -87,6 +87,26 @@ public class Question implements Serializable, Cloneable {
 		this.parameterString = parameterString;
 	}
 
+	Question (JsonObject jq) {
+		type = jq.get("type").getAsString();
+		prompt = jq.get("prompt").getAsString();
+		correctAnswer = jq.get("correctAnswer").getAsString();
+		switch (type) {
+		case "multiple_choice":
+		case "checkbox":
+			JsonArray chs = jq.get("choices").getAsJsonArray();
+			for (int i=0;i<chs.size();i++) {
+				choices.add(chs.get(i).getAsString());
+			}
+			scrambleChoices = true;  //jq.get("scrambled").getAsBoolean();
+			break;
+		case "numeric":
+			JsonElement unts = jq.get("units");
+			if (unts != null) units = unts.getAsString();
+			break;
+		}
+	}
+	
 	public String getCorrectAnswer() {
 		switch (type) {
 		case "multiple_choice":
@@ -585,26 +605,6 @@ public class Question implements Serializable, Cloneable {
 	void initializeCounters() {
 		nTotalAttempts = 0;
 		nCorrectAnswers = 0;
-	}
-	
-	String edit(JsonObject jq) {
-		type = jq.get("type").getAsString();
-		prompt = jq.get("prompt").getAsString();
-		correctAnswer = jq.get("correctAnswer").getAsString();
-		switch (type) {
-		case "multiple_choice":
-		case "checkbox":
-			JsonArray chs = jq.get("choices").getAsJsonArray();
-			for (int i=0;i<chs.size();i++) {
-				choices.add(chs.get(i).getAsString());
-			}
-			break;
-		case "numeric":
-			JsonElement unts = jq.get("units");
-			if (unts != null) units = unts.getAsString();
-			break;
-		}
-		return edit();
 	}
 	
 	String edit() {
