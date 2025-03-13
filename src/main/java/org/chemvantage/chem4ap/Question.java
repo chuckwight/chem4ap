@@ -110,9 +110,9 @@ public class Question implements Serializable, Cloneable {
 	public String getCorrectAnswer() {
 		switch (type) {
 		case "multiple_choice":
-			return choices.get(correctAnswer.charAt(0)-'a');
+			return choices.get(correctAnswer.charAt(0)-'a') + "<br/><br/>";
 		case "true_false":
-			return correctAnswer;
+			return correctAnswer + "<br/><br/>";
 		case "checkbox":
 			StringBuffer buf = new StringBuffer("<ul>");
 			for (int i=0; i<correctAnswer.length(); i++) {
@@ -122,10 +122,10 @@ public class Question implements Serializable, Cloneable {
 			return buf.toString();
 		case "fill_in_blank":
 			String[] answers = correctAnswer.split(",");
-			return answers[0];
+			return answers[0] + "<br/><br/>";
 		case "numeric":
 			return parseString(correctAnswer);
-		default: return correctAnswer + units==null?"":" " + units;
+		default: return correctAnswer + (units==null?"":" " + units) + "<br/><br/>";
 		}
 	}
 	
@@ -185,7 +185,8 @@ public class Question implements Serializable, Cloneable {
 	public String parseString(String raw, int outputType) {  
 		// this section uses a fully licensed version of the Jbc Math Parser
 		// from bestcode.com (license purchased by C. Wight on Nov 18, 2007)
-
+		if (raw==null) return null;
+		
 		raw = parseFractions(raw);  // converts a fraction like (|3|2|) to readable HTML form
 		raw = parseNumber(raw);		// converts entire input like "forty-two" to "42"
 		
@@ -456,7 +457,6 @@ public class Question implements Serializable, Cloneable {
 			buf.append("<span style='border: 1px solid black'>"
 					+ (showDetails?"<b>" + quot2html(answers[0]) + "</b>":"&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;")
 					+ "</span>");
-			if (units.length() > 0) buf.append("&nbsp;" + units + "<br/>");
 			break;
 		case "numeric":
 			buf.append(parseString(prompt) + "<br/>");
@@ -471,7 +471,7 @@ public class Question implements Serializable, Cloneable {
 			buf.append("<span style='border: 1px solid black'>"
 					+ (showDetails?"<b>" + getCorrectAnswer() + "</b>":"&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;")
 					+ "</span>");
-			buf.append("&nbsp;" + parseString(units) + "<br/>");
+			buf.append("&nbsp;" + (units==null?"":parseString(units)) + "<br/>");
 			break;        
 		case "essay":
 			buf.append(prompt);
@@ -486,10 +486,10 @@ public class Question implements Serializable, Cloneable {
 			buf.append("<b>The answer submitted was: </b><br/>" + studentAnswer + "<br/>");
 		} else {
 			buf.append("<b>The answer submitted was: " + studentAnswer + "</b>&nbsp;");
-			if (this.isCorrect(studentAnswer)) buf.append("&nbsp;<IMG SRC=/images/checkmark.gif ALT='Check mark' align=bottom>");
-			else if (this.agreesToRequiredPrecision(studentAnswer)) buf.append("<IMG SRC=/images/partCredit.png ALT='minus 1 sig figs' align=middle>"
+			if (this.isCorrect(studentAnswer)) buf.append("&nbsp;<IMG SRC=https://www.chem4ap.com/images/checkmark.gif ALT='Check mark' align=bottom>");
+			else if (this.agreesToRequiredPrecision(studentAnswer)) buf.append("<IMG SRC=https://www.chem4ap.com/images/partCredit.png ALT='minus 1 sig figs' align=middle>"
 					+ "<br/>Your answer must have exactly " + significantFigures + " significant digits.<br/>If your answer ends in a zero, then it must also have a decimal point to indicate which digits are significant.");
-			else buf.append("<IMG SRC=/images/xmark.png ALT='X mark' align=middle>");
+			else buf.append("<IMG SRC=https://www.chem4ap.com/images/xmark.png ALT='X mark' align=middle>");
 			buf.append("<br/><br/>");
 		}
 		

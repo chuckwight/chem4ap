@@ -8,6 +8,7 @@ import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.text.DecimalFormat;
 import java.util.Date;
+import java.util.UUID;
 
 import com.auth0.jwt.JWT;
 import com.auth0.jwt.algorithms.Algorithm;
@@ -36,10 +37,10 @@ public class Util {
 	@Id Long id = 1L;
 	private double avgStars = 0.0;
 	private int nStarReports = 0;
-	private String HMAC256Secret = "ChangeMe";
+	private String HMAC256Secret = UUID.randomUUID().toString();
 	private String reCaptchaSecret = "ChangeMe";
 	private String reCaptchaSiteKey = "ChangeMe";
-	private String salt = "ChangeMe";
+	private String salt = UUID.randomUUID().toString();
 	private String announcement = "ChangeMe";
 	private String sendGridAPIKey = "ChangeMe";
 	private String openAIKey = "ChangeMe";

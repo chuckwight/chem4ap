@@ -751,7 +751,7 @@ public class LTIMessage {  // utility for sending LTI-compliant "POX" or "REST+J
 					JsonObject json = JsonParser.parseReader(reader).getAsJsonObject();
 					reader.close();
 
-					// Copy the relevant parts of the json to the membershipContainer if they don;t already exist:
+					// Copy the relevant parts of the json to the membershipContainer if they don't already exist:
 					if (membershipContainer.get("id") == null) membershipContainer.add("id", json.get("id"));
 					if (membershipContainer.get("context") == null) membershipContainer.add("context", json.get("context"));
 					if (membershipContainer.get("members") == null) membershipContainer.add("members", json.get("members"));

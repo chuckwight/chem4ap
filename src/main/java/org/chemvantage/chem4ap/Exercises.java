@@ -155,11 +155,12 @@ public class Exercises extends HttpServlet {
 		JsonObject requestJson = JsonParser.parseReader(reader).getAsJsonObject();
 		
 		Long questionId = requestJson.get("id").getAsLong();
-		String studentAnswer = requestJson.get("answer").getAsString();
+		String studentAnswer = requestJson.get("answer").getAsString().trim();
 		
 		Question q = ofy().load().type(Question.class).id(questionId).safe();
+		Integer parameter = null;
 		if (q.requiresParser()) {
-			Integer parameter = requestJson.get("parameter").getAsInt();
+			parameter = requestJson.get("parameter").getAsInt();
 			q.setParameters(parameter);
 		}
 		
@@ -170,12 +171,12 @@ public class Exercises extends HttpServlet {
 		
 		StringBuffer buf = new StringBuffer();
 		buf.append(correct?"<h2>That's right! Your answer is correct.</h2>":
-			"<h2>Sorry, your answer is not correct</h2>"
-				+ "The correct answer is " 
-				+ q.getCorrectAnswer()
-				+ (q.units == null?"":" " + q.units)
-				+ "<br/>");
-		
+			"<h2>Sorry, your answer is not correct "
+			+ "<a href=/feedback?sig=" + user.getTokenSignature() + "&questionId=" + questionId + (parameter==null?"":"&parameter=" + parameter) + "&studentAnswer=" + URLEncoder.encode(studentAnswer, "UTF-8") + " style='display: inline;' target=_blank>"
+			+ "<img src=/images/feedback.png style='height:20px;vertical-align:8px;' alt='Report a problem' title='Report a problem' /></a></h2>"
+			+ "The correct answer is: " 
+			+ q.getCorrectAnswer() + (q.units == null?"":" " + q.units));
+
 		buf.append("Your score on this assignment is " + s.totalScore + "%");
 		
 		JsonObject responseJson = new JsonObject();
