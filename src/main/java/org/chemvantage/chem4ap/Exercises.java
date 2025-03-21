@@ -175,7 +175,7 @@ public class Exercises extends HttpServlet {
 			+ "<a href=/feedback?sig=" + user.getTokenSignature() + "&questionId=" + questionId + (parameter==null?"":"&parameter=" + parameter) + "&studentAnswer=" + URLEncoder.encode(studentAnswer, "UTF-8") + " style='display: inline;' target=_blank>"
 			+ "<img src=/images/feedback.png style='height:20px;vertical-align:8px;' alt='Report a problem' title='Report a problem' /></a></h2>"
 			+ "The correct answer is: " 
-			+ q.getCorrectAnswer() + (q.units == null?"":" " + q.units));
+			+ q.getCorrectAnswer());
 
 		buf.append("Your score on this assignment is " + s.totalScore + "%");
 		

@@ -124,8 +124,8 @@ public class Question implements Serializable, Cloneable {
 			String[] answers = correctAnswer.split(",");
 			return answers[0] + "<br/><br/>";
 		case "numeric":
-			return parseString(correctAnswer);
-		default: return correctAnswer + (units==null?"":" " + units) + "<br/><br/>";
+			return parseString(correctAnswer) + (units==null?"":" " + units) + "<br/><br/>";
+		default: return null;
 		}
 	}
 	
@@ -381,7 +381,7 @@ public class Question implements Serializable, Cloneable {
 			default:
 			}			
 			buf.append("<span style='border: 1px solid black'>"
-					+ "<b>" + (this.hasACorrectAnswer()?getCorrectAnswer():"&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;") + "</b>"
+					+ "<b>" + (this.hasACorrectAnswer()?parseString(correctAnswer):"&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;") + "</b>"
 					+ "</span>");
 			buf.append("&nbsp;" + parseString(units) + "<br/><br/>");
 			break;        
@@ -469,7 +469,7 @@ public class Question implements Serializable, Cloneable {
 			default:
 			}			
 			buf.append("<span style='border: 1px solid black'>"
-					+ (showDetails?"<b>" + getCorrectAnswer() + "</b>":"&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;")
+					+ (showDetails?"<b>" + parseString(correctAnswer) + "</b>":"&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;")
 					+ "</span>");
 			buf.append("&nbsp;" + (units==null?"":parseString(units)) + "<br/>");
 			break;        

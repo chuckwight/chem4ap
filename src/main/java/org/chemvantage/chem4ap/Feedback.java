@@ -21,18 +21,16 @@ public class Feedback extends HttpServlet {
 	public void doGet(HttpServletRequest request,HttpServletResponse response)
 			throws ServletException, IOException {
 		
-		User user = User.getUser(request.getParameter(request.getParameter("sig")));
-		if (user == null) response.sendRedirect("/");
-		
 		PrintWriter out = response.getWriter();
 		response.setContentType("text/html");
-		
+
 		try {
+			User user = User.getUser(request.getParameter("sig"));
+			if (user == null) response.sendRedirect("/");
+
 			out.println(feedbackForm(user,request));
 		} catch (Exception e) {
-			if (user.isChemVantageAdmin()) {
-				out.println(viewUserReports(user));
-			} else out.println("Error: " + e.getMessage());
+			out.println("Error: " + e.getMessage());
 		}
 	}
 	
