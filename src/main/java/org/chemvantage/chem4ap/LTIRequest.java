@@ -144,7 +144,8 @@ public class LTIRequest extends HttpServlet {
 			buf.append("<option value=" + u.id + ">" + u.title + "</option>");
 		}
 		buf.append("</select>");
-		buf.append("<input type=submit value='Create this assignment' />");
+		buf.append("<input type=submit value='Create this assignment' />"
+				+ "</form>");
 
 		buf.append(Util.foot());
 		} catch (Exception e) {
