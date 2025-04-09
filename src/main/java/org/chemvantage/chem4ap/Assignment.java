@@ -51,9 +51,10 @@ public class Assignment implements java.lang.Cloneable {
 		this.platform_deployment_id = platform_deployment_id;
 		this.created = new Date();
 		APChemUnit unit = ofy().load().type(APChemUnit.class).id(unitId).now();
-		for (Long tId : unit.topicIds) {
-			int nQuestions = ofy().load().type(Question.class).filter("assignmentType","Exercises").filter("topicId",tId).count();
-			if (nQuestions >5) topicIds.add(tId);
+		List<APChemTopic> topics = ofy().load().type(APChemTopic.class).filter("unitId",unit.id).order("topicNumber").list();
+		for (APChemTopic t: topics) {
+			int nQuestions = ofy().load().type(Question.class).filter("assignmentType","Exercises").filter("topicId",t.id).count();
+			if (nQuestions >5) topicIds.add(t.id);
 		}
 	}
 
