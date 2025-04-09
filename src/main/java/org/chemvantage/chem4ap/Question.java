@@ -59,6 +59,7 @@ public class Question implements Serializable, Cloneable {
 			int significantFigures = 0;
 			String parameterString;
 			boolean scrambleChoices;
+			boolean strictSpelling;
 			Integer nCorrectAnswers = null;
 			Integer nTotalAttempts = null;
 	@Ignore	int[] parameters = {0,0,0,0};
@@ -368,7 +369,7 @@ public class Question implements Serializable, Cloneable {
 			buf.append("<span style='color:#EE0000;font-size: small;'>Enter the correct word or phrase:</span><br/>");
 			buf.append("<span style='border: 1px solid black'>"
 					+ "<b>" + (this.hasACorrectAnswer()?quot2html(correctAnswer):"&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;") + "</b>"
-					+ "</span><br/><br/>");
+					+ "</span>" + (this.strictSpelling?" <span style='font-size:0.5em'>(strict spelling)</span>":"") + "<br/><br/>");
 			break;
 		case "numeric":
 			buf.append(parseString(prompt) + "<br/>");
@@ -666,7 +667,8 @@ public class Question implements Serializable, Cloneable {
 				buf.append("<span style='color:#EE0000;font-size: small;'>Enter the correct word or phrase.<br/>"
 						+ "Multiple correct answers can be entered as a comma-separated list.</span><br/>");
 				buf.append("<input type=text name=CorrectAnswer value=\"" 
-						+ quot2html(amp2html(correctAnswer)) + "\"'/><br/>");
+						+ quot2html(amp2html(correctAnswer)) + "\"'/>&nbsp;&nbsp;");
+				buf.append("<label><input type=checkbox name=StrictSpelling value=true " + (this.strictSpelling?"CHECKED":"") + " /> strict spelling</label><br/><br/>");
 				break;
 			case "numeric":
 				buf.append("Question Prompt:<br/><TEXTAREA name=Prompt rows=5 cols=60 wrap=soft>" 
@@ -723,12 +725,12 @@ public class Question implements Serializable, Cloneable {
 		case "fill_in_blank":
 			Collator compare = Collator.getInstance();
 			compare.setStrength(Collator.PRIMARY);
-			studentAnswer = studentAnswer.replaceAll("\\W", "");
+			studentAnswer = studentAnswer.replaceAll("\\W", ""); // removes any character not a letter, digit or underscore
 			String[] correctAnswers = correctAnswer.split(","); // break comma-separated list into array
 			for (int i=0;i<correctAnswers.length;i++) {
 				correctAnswers[i] = correctAnswers[i].replaceAll("\\W","");
 				if (compare.equals(studentAnswer,correctAnswers[i])) return true;
-				else if (closeEnough(studentAnswer.toLowerCase(),correctAnswers[i].toLowerCase())) return true;
+				else if (!strictSpelling && closeEnough(studentAnswer.toLowerCase(),correctAnswers[i].toLowerCase())) return true;
 			}
 			return false;
 		case "numeric":

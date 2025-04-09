@@ -179,6 +179,7 @@ public class QuestionManager extends HttpServlet {
 		q.units = request.getParameter("Units");
 		q.parameterString = parameterString;
 		q.scrambleChoices = Boolean.parseBoolean(request.getParameter("ScrambleChoices"));
+		q.strictSpelling = Boolean.parseBoolean(request.getParameter("StrictSpelling"));
 		return q;
 	}
 /*	
