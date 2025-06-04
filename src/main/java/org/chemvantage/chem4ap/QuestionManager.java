@@ -35,6 +35,20 @@ public class QuestionManager extends HttpServlet {
 		PrintWriter out = response.getWriter();
 		response.setContentType("text/html");
 		
+	/********* temporary utility for Microsoft Partnership *************************
+		if ("Get Json".equals(request.getParameter("UserRequest"))) {
+			try {
+				response.setContentType("text/plain");
+				Integer n = Integer.parseInt(request.getParameter("n"));
+				if (n<=0) throw new Exception("Enter a valid integer.");
+				out.println(sampleQuestions(n));
+			} catch (Exception e) {
+				out.println(e.getMessage());
+			}
+			return;
+		}
+	*********************************************************************************/	
+		
 		String userRequest = request.getParameter("UserRequest");
 		if (userRequest == null) userRequest = "";
 		
@@ -547,7 +561,70 @@ public class QuestionManager extends HttpServlet {
 		return buf.toString();
 	}
 	
-	String saveItems(HttpServletRequest request) {
+/********* temporary utility for Microsoft Partnership *************************
+
+	JsonArray sampleQuestions(int n) {
+		JsonArray questions = new JsonArray();
+		List<Key<Question>> keys = ofy().load().type(Question.class).keys().list();
+		Map<Long,APChemTopic> concepts = getConcepts();
+		Random random = new Random();
+		while (questions.size() < n) {
+			int i = random.nextInt(keys.size());  // choose a random position in the List
+			Key<Question> k = keys.remove(i);     // remove it from the List
+			Question q = ofy().load().key(k).now();  // get the Question entity
+			
+			if (q.topicId==null || concepts.get(q.topicId)==null) continue;  // must be authentic concept
+			JsonObject question = new JsonObject();
+			JsonArray choices = new JsonArray();
+			question.addProperty("concept", concepts.get(q.topicId).title);
+			switch (q.type) {
+			case "multiple_choice":
+				question.addProperty("question_type", "multiple_choice");
+				question.addProperty("text",q.prompt);
+				for (String choice:q.choices) choices.add(choice);
+				question.add("choices", choices);
+				question.addProperty("correct_answer", q.correctAnswer);
+				break;
+			case "true_false":
+				question.addProperty("question_type", "true_false");
+				question.addProperty("text",q.prompt);
+				question.addProperty("correct_answer", q.correctAnswer);
+				break;
+			case "checkbox":
+				question.addProperty("question_type", "checkbox");
+				question.addProperty("text",q.prompt);
+				for (String choice:q.choices) choices.add(choice);
+				question.add("choices", choices);
+				question.addProperty("correct_answer", q.correctAnswer);
+				break;
+			case "fill_in_blank":
+				question.addProperty("question_type", "fill_in_blank");
+				question.addProperty("text",q.prompt);
+				question.addProperty("correct_answer", q.getCorrectAnswer());
+				break;
+			case "numeric":
+				q.setParameters();
+				question.addProperty("question_type", "numeric");
+				question.addProperty("text",q.parseString(q.prompt));
+				question.addProperty("correct_answer", q.getCorrectAnswer());
+				if (q.units!=null) question.addProperty("units", q.parseString(q.units));
+				break;
+			default: continue;
+			}		
+			questions.add(question);
+		}
+		return questions;
+	}
+	
+	Map<Long,APChemTopic> getConcepts() {
+		Map<Long,APChemTopic> conceptMap = new HashMap<Long,APChemTopic>();
+		List<APChemTopic> conceptList = ofy().load().type(APChemTopic.class).list();
+		for (APChemTopic c : conceptList) conceptMap.put(c.id, c);
+		return conceptMap;
+	}
+**********************************************************************************/
+
+String saveItems(HttpServletRequest request) {
 		try {
 			String assignmentType = request.getParameter("AssignmentType");
 			Long topicId = Long.parseLong(request.getParameter("TopicId"));
@@ -624,6 +701,15 @@ public class QuestionManager extends HttpServlet {
 		buf.append("<h2>Question Items</h2>");
 		APChemUnit unit = null;
 		APChemTopic topic = null;
+		
+		/********* temporary utility for Microsoft Partnership *************************
+
+		// Temporary section to extract questions as JsonArray
+		buf.append("<p><form method=get>"
+				+ "Get <input type=text size=3 name=n /> questions as Json array "
+				+ "<input type=submit name=UserRequest value='Get Json' />"
+				+ "</form>");
+		***************************************************************************************/
 		
 		buf.append("<form><input type=hidden name=UserRequest value=ViewQuestions />");
 		
