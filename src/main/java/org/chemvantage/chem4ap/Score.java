@@ -5,7 +5,9 @@ import static com.googlecode.objectify.ObjectifyService.ofy;
 
 import java.net.URLEncoder;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Random;
 
 import com.googlecode.objectify.Key;
@@ -34,6 +36,41 @@ public class Score {
 		currentQuestionId = getNewQuestionId();
 	}
 	
+	int weightedRandomQuestionType(int score) {
+		Random random = new Random();
+		
+        // Step 1: Map score to quintile (1 to 5)
+        int quintile = score / 20 + 1;
+        if (quintile > 5) quintile = 5;  // in case score = 100%
+
+        // Step 2: Create map of weights for values 1 through 5
+        Map<Integer, Integer> weights = new LinkedHashMap<>();
+        for (int i = 1; i <= 5; i++) {
+            int distance = Math.abs(i - quintile);
+            int weight = switch (distance) {
+                case 0 -> 8;
+                case 1 -> 4;
+                case 2 -> 2;
+                case 3 -> 1;
+                default -> 0;
+            };
+            weights.put(i, weight);
+        }
+
+        // Step 3: Weighted random selection
+        int totalWeight = weights.values().stream().mapToInt(Integer::intValue).sum();
+        int rand = random.nextInt(totalWeight);
+
+        for (Map.Entry<Integer, Integer> entry : weights.entrySet()) {
+            rand -= entry.getValue();
+            if (rand < 0) {
+                return entry.getKey();
+            }
+        }
+
+        throw new RuntimeException("Weighted selection failed");
+    }
+	
 	void repairMe(Assignment a) {
 		/* 
 		 * This method is required in the event that the instructor changes the topics
@@ -55,10 +92,10 @@ public class Score {
 	void update(User user, Question q, int qScore) throws Exception {
 		/* Algorithm for tracking topic scores and totalScore:
 		 * The totalScore is calculated as a running average
-		 *   totalScore = (120*qScore + 11*totalScore)/12;
-		 * When qScore=1, starts with 10% increase, last is 1% increase to 100.
+		 *   totalScore = (150*qScore + 14*totalScore)/15;
+		 * When qScore=1, starts with 10% increase, last is 3% increase to 100.
 		 * The value of totalScore is not permitted to exceed 100
-		 * or to go below the floor of the current quartile score.
+		 * or to go below the floor of the current decile score.
 		 * 
 		 * Each topic score is also tracked separately using
 		 *   topicScore = (100*qScore + 2*topicScore)/3;
@@ -70,8 +107,8 @@ public class Score {
 		 */
 		
 		// Update the totalScore:
-		int floor = totalScore/25*25;  // 0, 25, 50, 75, 100
-		totalScore = (120*qScore + 11*totalScore)/12;
+		int floor = totalScore/10*10;  // 0, 10, 20, 30,... 100
+		totalScore = (150*qScore + 14*totalScore)/15;
 		if (totalScore > 100) totalScore = 100;
 		if (totalScore < floor) totalScore = floor;
 		
@@ -84,7 +121,7 @@ public class Score {
 		currentQuestionId = getNewQuestionId();
 		
 		// Create a Task to report the score to the LMS
-		if (totalScore > maxScore) { // only report if maxScore increases
+		if (totalScore >= maxScore) { // only report if maxScore increases
 			maxScore = totalScore;
 			String payload = "AssignmentId=" + id + "&UserId=" + URLEncoder.encode(user.getId(),"UTF-8");
 			Util.createTask("/report",payload);
@@ -128,6 +165,17 @@ public class Score {
 			}
 		} else topicId = topicIds.get(random.nextInt(topicIds.size()));
 
+		int questionType = weightedRandomQuestionType(totalScore);
+		
+		List<Key<Question>> questionKeys = switch (questionType) {
+			case 1 -> ofy().load().type(Question.class).filter("assignmentType","Exercises").filter("topicId",topicId).filter("type","true_false").keys().list();
+			case 2 -> ofy().load().type(Question.class).filter("assignmentType","Exercises").filter("topicId",topicId).filter("type","multiple_choice").keys().list();
+			case 3 -> ofy().load().type(Question.class).filter("assignmentType","Exercises").filter("topicId",topicId).filter("type","fill_in_blank").keys().list();
+			case 4 -> ofy().load().type(Question.class).filter("assignmentType","Exercises").filter("topicId",topicId).filter("type","checkbox").keys().list();
+			default -> ofy().load().type(Question.class).filter("assignmentType","Exercises").filter("topicId",topicId).filter("type","numeric").keys().list();		
+		};
+		
+/*
 		// Gather question keys for types based on quartile score for the topic
 		// Quartile 1 gets TF & MC, Q2 gets MC & FB, Q3 gets FB & CB, Q4 gets CB & NU
 		int quartile = totalScore/25 + 1;
@@ -148,7 +196,7 @@ public class Score {
 			if (quartile == 3) break;
 			questionKeys.addAll(ofy().load().type(Question.class).filter("assignmentType","Exercises").filter("topicId",topicId).filter("type","numeric").keys().list());
 		}
-
+*/
 		// Eliminate any questions recently answered or on deck
 		questionKeys.removeAll(recentQuestionKeys);
 
