@@ -56,8 +56,11 @@ public class UserReport implements Serializable {
 			Question q = ofy().load().type(Question.class).id(this.questionId).safe();
 			if (q.requiresParser()) q.setParameters(parameter);
 
-			buf.append(q.printAllToStudents(studentAnswer,true,false) + "<br/>"
-				+ "The user's answer was: ");
+			buf.append(q.printAllToStudents(studentAnswer,true,false) + "<br/>");
+			
+			buf.append("<a href=https://www.chem4ap.com/questions?UserRequest=EditQuestion&QuestionId=" + q.id + " target=_blank>Edit this question</a>");
+/*			
+			buf.append("The user's answer was: ");
 			
 			int j = 0;
 			switch (q.type) {
@@ -76,6 +79,7 @@ public class UserReport implements Serializable {
 			default:
 				buf.append("<b>" + studentAnswer + "</b><br/><br/>");
 			}
+*/
 		}
 		return buf.toString();
 	}
