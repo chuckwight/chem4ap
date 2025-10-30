@@ -27,8 +27,15 @@ public class Feedback extends HttpServlet {
 		try {
 			User user = User.getUser(request.getParameter("sig"));
 			if (user == null) response.sendRedirect("/");
-
-			out.println(feedbackForm(user,request));
+			String userRequest = request.getParameter("UserRequest");
+			if (userRequest==null) userRequest = "";
+			
+			switch (userRequest) {
+			case "ViewFeedback":
+				out.println(viewUserReports(user));
+			default:
+				out.println(feedbackForm(user,request));						
+			}
 		} catch (Exception e) {
 			out.println("Error: " + e.getMessage());
 		}
@@ -41,15 +48,19 @@ public class Feedback extends HttpServlet {
 		response.setContentType("text/html");
 
 		User user = User.getUser(request.getParameter("sig"));
-		if (user == null) response.sendRedirect("/");
+		if (user == null) response.sendError(401,"Unauthorized");
 
 		String userRequest = request.getParameter("UserRequest");
+		if (userRequest==null) userRequest = "";
+		
 		if ("Delete Report".equals(userRequest)) {
+			if (!user.isChemVantageAdmin()) return;
 			Long reportId = Long.parseLong(request.getParameter("ReportId"));
 			ofy().delete().type(UserReport.class).id(reportId).now();
 			out.println(viewUserReports(user));
 			return;
 		}
+		
 		try {	
 			createUserReport(user,request);
 
@@ -161,7 +172,7 @@ public class Feedback extends HttpServlet {
 		StringBuffer buf = new StringBuffer(Util.banner + Util.head("User Feedback"));
 		if (!user.isChemVantageAdmin()) return "<h1>Unauthorized</h1>";
 		
-		buf.append("<h1>User Feedback</h1");
+		buf.append("<h1>User Feedback</h1>");
 		List<UserReport> reports = ofy().load().type(UserReport.class).list();
 		if (reports.size()==0) buf.append("There are no new user reports.");
 		
@@ -172,8 +183,9 @@ public class Feedback extends HttpServlet {
 			buf.append("<a href=/questions?UserRequest=EditQuestion&QuestionId=" + r.questionId + ">Edit Question</a>"
 					+ " or "
 					+ "<form method=post action=/feedback style='display:inline'>"
+					+ "<input type=hidden name=sig value=" + user.getTokenSignature() + " />"
 					+ "<input type=hidden name=ReportId value=" + r.id + " />"
-					+ "<input type=submit name=UserRequest value='Delete Report' />"
+					+ "<input type=submit name=UserRequest value='Delete Report' class='btn btn-primary' />"
 					+ "</form><hr>");
 		}
 		return buf.toString() + Util.foot();

@@ -52,34 +52,13 @@ public class UserReport implements Serializable {
 	public String view() {
 		StringBuffer buf = new StringBuffer();
 		buf.append("<FONT COLOR=RED>" + comments + "</FONT><br>");
-		if (this.questionId>0) {			
+		try {			
 			Question q = ofy().load().type(Question.class).id(this.questionId).safe();
 			if (q.requiresParser()) q.setParameters(parameter);
 
 			buf.append(q.printAllToStudents(studentAnswer,true,false) + "<br/>");
-			
-			buf.append("<a href=https://www.chem4ap.com/questions?UserRequest=EditQuestion&QuestionId=" + q.id + " target=_blank>Edit this question</a>");
-/*			
-			buf.append("The user's answer was: ");
-			
-			int j = 0;
-			switch (q.type) {
-			case "multiple_choice":
-				j = studentAnswer.charAt(0)-'a';
-				buf.append("<b>" + q.choices.get(j) + "</b><br/><br/>");
-				break;
-			case "checkbox":
-				buf.append("<ul>");
-				for (int i=0;i<studentAnswer.length();i++) {
-					j = studentAnswer.charAt(i)-'a';
-					buf.append("<li><b>" + q.choices.get(j) + "</b></li>");
-				}
-				buf.append("</ul>");
-				break;
-			default:
-				buf.append("<b>" + studentAnswer + "</b><br/><br/>");
-			}
-*/
+		} catch (Exception e) {
+			buf.append(e.getMessage() + "<br/>(question not be found)<br/><br/>");
 		}
 		return buf.toString();
 	}

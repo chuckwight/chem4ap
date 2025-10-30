@@ -13,7 +13,7 @@ handlers:
   secure: always
 
 # All requests to the following URLs are restricted to admins or service accounts
-- url: /(units|questions|report)
+- url: /(units|questions|report|admin)
   secure: always
   login: admin
   script: auto
