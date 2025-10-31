@@ -53,7 +53,7 @@ public class Util {
 	
 	private Util() {}
 	
-	static String banner = "<div style='font-size:2em;font-weight:bold;color:#000080;'><img src='/images/chem4ap_atom.png' alt='Chem4AP Logo' style='vertical-align:middle;width:60px;'> Chem4AP</div>";
+	static String banner = "<div style='font-size:2em;font-weight:bold;color:#000080;'><img src='/images/chem4ap_atom.png' alt='Chem4AP Logo' style='vertical-align:middle;width:60px;'> Chem4AP</div><br/>";
 
 	void addStarReport(int stars) {
 		avgStars = (avgStars*nStarReports + stars)/(nStarReports+1);
