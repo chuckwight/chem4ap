@@ -39,7 +39,7 @@ public class Assignment implements java.lang.Cloneable {
 	@Index	Date valid;
 			String lti_nrps_context_memberships_url;
 			String title;
-			Long unitId;
+	@Index	Long unitId;
 			List<Long> topicIds = new ArrayList<Long>();
 			
 	Assignment() {}
