@@ -61,6 +61,14 @@ public class User {
 		hashedId = Util.hashId(encryptedId);
 	}
 
+	User(String email) {  // constructor for independent student user
+		this.platformId = "https://www.chem4ap.com";
+		String user_id = platformId + "/" + email;
+		this.hashedId = Util.hashId(user_id);
+		this.exp = new Date(new Date().getTime() + 5400000L);  // value expires 90 minutes from now
+		this.encryptedId = encryptId(user_id,0L);  // temporary until sig is assigned in setToken()
+	}
+	
 	User(String platformId, String id) {  // used for LTI 1.3 and LTIDeepLinks launches
 		// First look for this user in the database to avoid creating a duplicate entry
 		// If not found, create a new one.
