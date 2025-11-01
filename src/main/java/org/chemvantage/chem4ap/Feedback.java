@@ -161,10 +161,11 @@ public class Feedback extends HttpServlet {
  				+ "<input type=hidden name=QuestionId value=" + q.id + " />"
 				+ (parameter==null?"":"<input type=hidden name=Parameter value=" + parameter + " />")
 		 		+ "<input type=hidden name=StudentAnswer value='" + studentAnswer + "' />"
-				+ "Your Comment: <INPUT TYPE=TEXT SIZE=80 NAME=Comment /><br/>"
-		 		+ "<input type=submit class='btn btn-primary' value='Submit Feedback' />"
+				+ "Your Comment: <INPUT TYPE=TEXT SIZE=80 NAME=Comment /><br/><br/>"
+		 		+ "<input type=submit class='btn btn-primary' value='Submit Feedback' />&nbsp;&nbsp;"
+		 		+ "<button class='btn btn-primary' onClick='window.close();'>Never Mind</button>"
 		 		+ "</form>");
-			
+				
 		return buf.toString() + Util.foot();
 	}
 	
