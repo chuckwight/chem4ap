@@ -45,6 +45,8 @@ public class Util {
 	private String sendGridAPIKey = "ChangeMe";
 	private String openAIKey = "ChangeMe";
 	private String gptModel = "ChangeMe";
+	private String payPalClientId = "ChangeMe";
+	private String payPalClientSecret = "ChangeMe";
 	
 	@Ignore static final String projectId = ServiceOptions.getDefaultProjectId();
 	
@@ -146,6 +148,16 @@ public class Util {
 		return u.HMAC256Secret; 
 	}
 
+	static String getPayPalClientId() {
+		refresh();
+		return u.payPalClientId;
+	}
+	
+	static String getPayPalClientSecret() {
+		refresh();
+		return u.payPalClientSecret;
+	}
+	
 	static String getReCaptchaSecret() {
 		refresh();
 		return u.reCaptchaSecret;

@@ -125,7 +125,9 @@ public class Launch extends HttpServlet {
 				ofy().save().entity(a).now();
 			}
 			user.setAssignment(a.id);
-			response.sendRedirect(Util.getServerUrl() + "/exercises/index.html?t=" + Util.getToken(user.getTokenSignature()));
+			APChemUnit u = ofy().load().type(APChemUnit.class).id(unitId).safe();
+			if (user.isPremium() || u.unitNumber==0) response.sendRedirect(Util.getServerUrl() + "/exercises/index.html?t=" + Util.getToken(user.getTokenSignature()));
+			else response.sendRedirect("/checkout?sig=" + user.getTokenSignature());
 			return;
 		} catch (Exception e) {}
 		
@@ -235,7 +237,10 @@ public class Launch extends HttpServlet {
 		
 		if (!user.isPremium()) { // autoselects Unit0 for users on free trial
 			Long unitZeroId = units.get(0).id;
-			buf.append("<script>unitClicked(" + unitZeroId + ")</script>");
+			buf.append("<script>"
+				+ "unitClicked(" + unitZeroId + ");"
+				+ "document.querySelector('input[name=\"UnitId\"]').checked=true;"
+				+ "</script>");
 		}
 		return buf.toString();
 	}
