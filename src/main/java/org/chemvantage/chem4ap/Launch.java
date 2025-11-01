@@ -92,7 +92,7 @@ public class Launch extends HttpServlet {
 				+ "Use this form to get a valid login link:<br/>"
 				+ "<form action='/launch' method='POST' class='mt-4'>\n"
 				+ "  <div class='input-group input-group-lg shadow-sm' style='max-width:800px'>\n"
-				+ "    <input type='email' class='form-control' name='email' placeholder='Enter your email address' aria-label='Enter your email address' required>\n"
+				+ "    <input type='email' class='form-control' name='Email' placeholder='Enter your email address' aria-label='Enter your email address' required>\n"
 				+ "    <button class='btn btn-primary' type='submit'>Send Me A Secure Login Link</button>\n"
 				+ "  </div>\n"
 				+ "  <div class='form-text mt-2'>\n"
@@ -193,9 +193,11 @@ public class Launch extends HttpServlet {
 				userPctScore = scores.get(key(userKey,Score.class,a.id)).totalScore;
 			} catch (Exception e) {}
 			
-			buf.append("<li><label><input type=radio name=UnitId value=" + u.id
-					+ " onclick=unitClicked('" + u.id + "') />"
-					+ "<b> Unit " + u.unitNumber + " - " + u.title + " (" + userPctScore + "% completed)</b></label></li>");
+			buf.append("<li><label>"
+					+ "<input type=radio name=UnitId value=" + u.id + " onclick=unitClicked('" + u.id + "') />"
+					+ "<b> Unit " + u.unitNumber + " - " + u.title + (userPctScore==0?"":" (" + userPctScore + "%)") + "</b></label>&nbsp;"
+					+ "<input id=start" + u.id + " class='startButton btn btn-primary' style='display:none' type=submit value='" + (userPctScore==0?"Start":"Resume") + "' />"
+					+ "</li>");
 			buf.append("<ul style='list-style: none;'>");
 			List<APChemTopic> topics = ofy().load().type(APChemTopic.class).filter("unitId",u.id).order("topicNumber").list();
 			for(APChemTopic t : topics) {
@@ -205,7 +207,6 @@ public class Launch extends HttpServlet {
 		}
 		buf.append("</ul>"
 				+ "<input type=hidden name=sig value=" + user.getTokenSignature() + " />"
-				+ "<input type=submit id=startButton class='btn btn-primary' value='Select a Unit' disabled/>"
 				+ "</form>");
 		
 		// Build a script to show/hide topics for the selected unit
@@ -219,9 +220,11 @@ public class Launch extends HttpServlet {
 				+ "  for (var i=0;i<unitListItems.length;i++) {"
 				+ "    unitListItems[i].style='display:list-item';"
 				+ "  }"
-				+ "  var startButton = document.getElementById('startButton');"
-				+ "  startButton.value = 'Start This Unit';"
-				+ "  startButton.disabled = false;"
+				+ "  var startButtons = document.querySelectorAll('.startButton');"
+				+ "  for (var i=0;i<startButtons.length;i++) {"
+				+ "    startButtons[i].style='display:none';"
+				+ "  }"
+				+ "  document.getElementById('start' + unitId).style='display:inline';"
 				+ "}"
 				+ "</script>");
 		
