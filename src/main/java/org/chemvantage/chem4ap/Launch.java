@@ -172,6 +172,11 @@ public class Launch extends HttpServlet {
 	
 	String unitSelectForm(User user) {
 		StringBuffer buf = new StringBuffer("<h1>Select a Unit</h1>");
+		if (!user.isPremium()) {
+			buf.append("Your free trial account includes access to Unit 0 - Prepare for AP Chemistry. "
+					+ "This will give you a feel for how to use the app by progressing through the different types of questions. "
+					+ "If you start Units 1-9 you will be asked to purchase a subscription.<br/><br/>");
+		}
 		List<APChemUnit> units = ofy().load().type(APChemUnit.class).order("unitNumber").list();
 		
 		// Create a Map of Chem4AP assignments by UnitID
@@ -228,6 +233,10 @@ public class Launch extends HttpServlet {
 				+ "}"
 				+ "</script>");
 		
+		if (!user.isPremium()) { // autoselects Unit0 for users on free trial
+			Long unitZeroId = units.get(0).id;
+			buf.append("<script>unitClicked(" + unitZeroId + ")</script>");
+		}
 		return buf.toString();
 	}
 }

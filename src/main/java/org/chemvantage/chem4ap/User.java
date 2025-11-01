@@ -18,6 +18,7 @@
 package org.chemvantage.chem4ap;
 
 import static com.googlecode.objectify.ObjectifyService.ofy;
+import static com.googlecode.objectify.ObjectifyService.key;
 
 import java.util.Date;
 import java.util.Random;
@@ -226,6 +227,7 @@ public class User {
 	boolean isPremium() {
 		try {
 			if (isInstructor() || isTeachingAssistant()) return true;
+			ofy().load().key(key(PremiumUser.class,this.hashedId)).safe();
 			return true;
 		} catch (Exception e) {
 			return false; // not found
