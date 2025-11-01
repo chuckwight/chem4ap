@@ -230,6 +230,10 @@ public class Launch extends HttpServlet {
 				+ "}"
 				+ "</script>");
 		
+		if (!user.isPremium()) { // autoselects Unit0 for users on free trial
+			Long unitZeroId = units.get(0).id;
+			buf.append("<script>unitClicked(" + unitZeroId + ")</script>");
+		}
 		return buf.toString();
 	}
 }
