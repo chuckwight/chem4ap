@@ -31,6 +31,7 @@ import java.net.URL;
 import java.text.DateFormat;
 import java.util.Base64;
 import java.util.Date;
+import java.util.Random;
 import java.util.UUID;
 
 import com.google.gson.JsonArray;
@@ -94,7 +95,7 @@ public class Checkout extends HttpServlet {
 			
 			if (user.isPremium()) {  // do not allow the user to use this page
 				Assignment a = ofy().load().type(Assignment.class).id(user.getAssignmentId()).now();
-				if (a != null) response.sendRedirect("/" + a.assignmentType + "?sig=" + user.getTokenSignature());
+				if (a != null) response.sendRedirect("/" + a.assignmentType.toLowerCase() + "?t=" + Util.getToken(user.getTokenSignature()));
 				else out.println("Your subscription is active.");
 				return;
 			}
@@ -142,7 +143,7 @@ public class Checkout extends HttpServlet {
 		String title = (u != null && u.exp.before(now))?"Your Chem4AP subscription expired on " + df.format(u.exp):"Individual Chem4AP Subscription";
 
 		buf.append("<h1>" + title + "</h1>\n"
-				+ "A subscription is required to access Chem4AP assignments. "
+				+ "A subscription is required to access Chem4AP Units 1-9. "
 				+ "First, please indicate your agreement with the two statements below by checking the boxes.<br/><br/>"
 				+ "<label><input type=checkbox id=terms onChange=showSelectPaymentMethod();> I understand and agree to the <a href=/terms.html target=_blank>Chem4AP Terms and Conditions of Use</a>.</label> <br/>"
 				+ "<label><input type=checkbox id=norefunds onChange=showSelectPaymentMethod();> I understand that all Chem4AP subscription fees are non-refundable.</label> <br/><br/>");
@@ -171,9 +172,11 @@ public class Checkout extends HttpServlet {
 		buf.append("</div>");  // end of payment div
 		
 		buf.append("<div id=proceed style='display: none'><br/><br/>"
-				+ "<a class='btn btn-primary' href='/" + a.assignmentType.toLowerCase() + "?sig=" + user.getTokenSignature() + "'>Proceed to Chem4AP</a><br/><br/>"
+				+ "<a class='btn btn-primary' href='/" + a.assignmentType.toLowerCase() + "?t=" + Util.getToken(user.getTokenSignature()) + "'>Proceed to Chem4AP</a><br/><br/>"
 				+ "</div>");
 		
+		buf.append("<script src='https://www.paypal.com/sdk/js?client-id=" + Util.getPayPalClientId() + "&enable-funding=venmo&disable-funding=paylater'></script>");
+		buf.append("<script src='/js/checkout.js?r=" + new Random().nextInt() + "'></script>");
 		buf.append(Util.foot());
 		
 		return buf.toString();
@@ -234,16 +237,24 @@ public class Checkout extends HttpServlet {
 			wr.writeBytes(body);
 			wr.close();
 
-			BufferedReader reader = new BufferedReader(new InputStreamReader(uc.getInputStream()));				
-			auth_json = JsonParser.parseReader(reader).getAsJsonObject();
-			reader.close();
+			BufferedReader reader = null;
+			if (uc.getResponseCode()/100==2) {
+				reader = new BufferedReader(new InputStreamReader(uc.getInputStream()));				
+				auth_json = JsonParser.parseReader(reader).getAsJsonObject();
+				reader.close();
 
-			// Cache the auth_json for future use
-			int expires_in = auth_json.get("expires_in").getAsInt();  // seconds from now
-			Long exp = new Date(new Date().getTime() + expires_in*1000L - 5000L).getTime();  // exp millis - 5 s grace
-			auth_json.addProperty("exp", exp);
-		
-			return auth_json.get("access_token").getAsString();
+				// Cache the auth_json for future use
+				int expires_in = auth_json.get("expires_in").getAsInt();  // seconds from now
+				Long exp = new Date(new Date().getTime() + expires_in*1000L - 5000L).getTime();  // exp millis - 5 s grace
+				auth_json.addProperty("exp", exp);
+				return auth_json.get("access_token").getAsString();
+			} else {
+				reader = new BufferedReader(new InputStreamReader(uc.getErrorStream()));				
+				JsonObject json = JsonParser.parseReader(reader).getAsJsonObject();
+				reader.close();
+				Util.sendEmail("ChemVantage LLC", "admin@chemvantage.org", "PayPal AuthToken Error", json.toString());
+				return null;
+			}
 		}
 	}
 	
@@ -283,19 +294,30 @@ public class Checkout extends HttpServlet {
 		writer.close();
 		uc.getOutputStream().close();
 
-		BufferedReader reader = new BufferedReader(new InputStreamReader(uc.getInputStream()));				
-		String order_id = JsonParser.parseReader(reader).getAsJsonObject().get("id").getAsString();
-		reader.close();
-		
-		ofy().save().entity(new PayPalOrder(order_id,new Date(),order_data.toString(),nMonths,value,user,platform_deployment_id,request_id));
-		
-		return order_id;
+		BufferedReader reader = null;
+		if (uc.getResponseCode()/100==2) {
+			reader = new BufferedReader(new InputStreamReader(uc.getInputStream()));				
+			String order_id = JsonParser.parseReader(reader).getAsJsonObject().get("id").getAsString();
+			reader.close();
+			ofy().save().entity(new PayPalOrder(order_id,new Date(),order_data.toString(),nMonths,value,user,platform_deployment_id,request_id));
+			return order_id;
+		} else {
+			reader = new BufferedReader(new InputStreamReader(uc.getErrorStream()));				
+			JsonObject json = JsonParser.parseReader(reader).getAsJsonObject();
+			reader.close();
+			Util.sendEmail("ChemVantage LLC", "admin@chemvantage.org", "PayPal OrderId Error", json.toString());
+			return null;
+		}
 	}
 	
 	JsonObject completeOrder(User user, HttpServletRequest request) throws Exception {
 		String order_id = request.getParameter("order_id");
 		PayPalOrder order = ofy().load().type(PayPalOrder.class).id(order_id).safe();
-		Deployment deployment = ofy().load().type(Deployment.class).id(order.platform_deployment_id).now();
+		String organization = "Chem4AP";
+		try {
+			Deployment deployment = ofy().load().type(Deployment.class).id(order.platform_deployment_id).safe();
+			organization = deployment.organization;
+		} catch (Exception e) {}
 		String baseUrl = "https://api-m." + (Util.projectId.equals("dev-chem4ap")?"sandbox.":"") + "paypal.com";
 		
 		URL u = new URI(baseUrl + "/v2/checkout/orders/" + order_id + "/capture").toURL();
@@ -311,7 +333,7 @@ public class Checkout extends HttpServlet {
 		
 		order.status = resp.get("status").getAsString();  // update order status
 		if (order.status.equals("COMPLETED")) {  // create new PremiumUser
-			PremiumUser pu = new PremiumUser(user.getHashedId(), order.nMonths, order.value, deployment.getOrganization(),order.id);
+			PremiumUser pu = new PremiumUser(user.getHashedId(), order.nMonths, order.value, organization,order.id);
 			resp.addProperty("expires", pu.exp.toString());
 		}
 		ofy().save().entity(order);

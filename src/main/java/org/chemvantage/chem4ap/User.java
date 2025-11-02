@@ -227,8 +227,9 @@ public class User {
 	boolean isPremium() {
 		try {
 			if (isInstructor() || isTeachingAssistant()) return true;
-			ofy().load().key(key(PremiumUser.class,this.hashedId)).safe();
-			return true;
+			PremiumUser pu = ofy().load().key(key(PremiumUser.class,this.hashedId)).safe();
+			if (pu.exp.after(new Date())) return true;
+			return false;
 		} catch (Exception e) {
 			return false; // not found
 		}
