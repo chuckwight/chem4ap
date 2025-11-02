@@ -278,7 +278,7 @@ public class LTIRegistration extends HttpServlet {
 		
 		if (!"true".equals(request.getParameter("AcceptChem4APTOS"))) throw new Exception("Please read and accept the Chem4AP Terms of Service. ");
 
-		String iss = Util.projectId.equals("dev-chem4ap")?"https://dev-chem4ap.appspot.com":"https://www.chem4ap.com";
+		String iss = Util.getServerUrl();
 		
 		if (Util.projectId.equals("dev-chem4ap") ) {
 			String reg_code = request.getParameter("reg_code");
@@ -644,18 +644,9 @@ public class LTIRegistration extends HttpServlet {
 		JsonArray responseTypes = new JsonArray();
 		responseTypes.add("id_token");
 		regJson.add("response_types", responseTypes);
-		String projectId = Util.projectId;
-		String iss = null;
-		String domain = null;
-		switch (projectId) {
-		case "dev-chem4ap":
-			iss = "https://dev-chem4ap.appspot.com";
-			domain = "dev-chem4ap.appspot.com";
-			break;
-		case "chem4ap":
-			iss = "https://www.chem4ap.com";
-			domain = "chem4ap.com";
-		}
+		String iss = Util.getServerUrl();
+		String domain = Util.projectId;
+		
 		JsonArray redirectUris = new JsonArray();
 		redirectUris.add(iss + "/lti");
 		regJson.add("redirect_uris", redirectUris);
@@ -877,15 +868,7 @@ public class LTIRegistration extends HttpServlet {
 	
 	static void sendApprovalEmail(Deployment d, HttpServletRequest request) {
 		StringBuffer buf = new StringBuffer();
-		String project_id = Util.projectId;
-		String iss = null;
-		switch (project_id) {
-		case "dev-chem4ap":
-			iss = "https://dev-chem4ap.appspot.com";
-			break;
-		case "chem4ap":
-			iss = "https://www.chem4ap.com";
-		}
+		String iss = Util.getServerUrl();
 		
 		buf.append("<h2>Chem4AP Registration Success</h2>"
 				+ "Congratulations! Your LTI registration has been completed:<br/>"

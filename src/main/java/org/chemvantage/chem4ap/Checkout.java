@@ -71,10 +71,7 @@ public class Checkout extends HttpServlet {
 				else out.println("Your subscription is active.");
 				return;
 			}
-			String platform_deployment_id = "https://www.chem4ap.com";
-			if (!user.platformId.equals("https://www.chem4ap.com")) {
-				platform_deployment_id = ofy().load().type(Deployment.class).id(request.getParameter("d")).now().platform_deployment_id;
-			}
+			String platform_deployment_id = user.platformId.equals(Util.getServerUrl())?user.platformId:ofy().load().type(Deployment.class).id(request.getParameter("d")).now().platform_deployment_id;
 			out.println(checkoutPage(user,platform_deployment_id));	
 		} catch (Exception e) {
 			ofy().delete().entity(user).now();

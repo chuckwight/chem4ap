@@ -46,7 +46,7 @@ public class Launch extends HttpServlet {
 		
 		String token = request.getParameter("t");
 		if (token==null) {
-			response.sendRedirect("https://www.chem4ap.com");
+			response.sendRedirect(Util.getServerUrl());
 			return;
 		}
 		
@@ -65,20 +65,20 @@ public class Launch extends HttpServlet {
 			Date now = new Date();
 			Date exp = new Date(now.getTime() + 604800000L); // seven days from now
 			token = JWT.create()
-				.withIssuer("https://www.chem4ap.com")
+				.withIssuer(Util.getServerUrl())
 				.withSubject(email)
 				.withExpiresAt(exp)
 				.sign(algorithm);
 
 			String emailMessage = "<h1>Chem4AP Login Link</h1>"
-				+ "<a href='https://www.chem4ap.com/launch?t=" + token + "'>"
+				+ "<a href='" + Util.getServerUrl() + "/launch?t=" + token + "'>"
 				+ "<button style='border:none;color:white;padding:10px 10px;margin:4px 2px;font-size:16px;cursor:pointer;border-radius:10px;background-color:blue;'>"
 				+ "Login to Chem4AP Now"
 				+ "</button>"
 				+ "</a><br/><br/>"
 				+ "You may reuse this login button multiple times for a week until it expires on " + exp.toString() + "<br/.<br/>"
 				+ "If the button doesn't work, paste the following link into your browser:<br/>"
-				+ "https://www.chem4ap.com/launch?t=" + token;
+				+ Util.getServerUrl() + "/launch?t=" + token;
 
 			Util.sendEmail(null, email, "Chem4AP Login Link", emailMessage);
 
@@ -119,9 +119,9 @@ public class Launch extends HttpServlet {
 			if (user==null) {
 				buf.append("<h1>Unauthorized</h1>");
 			}
-			Assignment a = ofy().load().type(Assignment.class).filter("platform_deployment_id","https://www.chem4ap.com").filter("unitId",unitId).first().now();
+			Assignment a = ofy().load().type(Assignment.class).filter("platform_deployment_id",Util.getServerUrl()).filter("unitId",unitId).first().now();
 			if (a==null) {  //create a new Assignment entity
-				a = new Assignment("Exercises","",unitId,"https://www.chem4ap.com");
+				a = new Assignment("Exercises","",unitId,Util.getServerUrl());
 				ofy().save().entity(a).now();
 			}
 			user.setAssignment(a.id);
@@ -142,20 +142,20 @@ public class Launch extends HttpServlet {
 				Date exp = new Date(now.getTime() + 604800000L); // seven days from now
 				Algorithm algorithm = Algorithm.HMAC256(Util.getHMAC256Secret());
 				String token = JWT.create()
-						.withIssuer("https://www.chem4ap.com")
+						.withIssuer(Util.getServerUrl())
 						.withSubject(email)
 						.withExpiresAt(exp)
 						.sign(algorithm);
 
 				String emailMessage = "<h1>Chem4AP Login Link</h1>"
-						+ "<a href='https://www.chem4ap.com/launch?t=" + token + "'>"
+						+ "<a href='" + Util.getServerUrl() + "/launch?t=" + token + "'>"
 						+ "<button style='border:none;color:white;padding:10px 10px;margin:4px 2px;font-size:16px;cursor:pointer;border-radius:10px;background-color:blue;'>"
 						+ "Login to Chem4AP Now"
 						+ "</button>"
 						+ "</a><br/><br/>"
 						+ "You may reuse this login button multiple times for a week until it expires on " + exp.toString() + "<br/.<br/>"
 						+ "If the button doesn't work, paste the following link into your browser:<br/>"
-						+ "https://www.chem4ap.com/launch?t=" + token;
+						+ Util.getServerUrl() + "/launch?t=" + token;
 
 				Util.sendEmail(null, email, "Chem4AP Login Link", emailMessage);
 
@@ -182,7 +182,7 @@ public class Launch extends HttpServlet {
 		List<APChemUnit> units = ofy().load().type(APChemUnit.class).order("unitNumber").list();
 		
 		// Create a Map of Chem4AP assignments by UnitID
-		List<Assignment> assignmentList = ofy().load().type(Assignment.class).filter("assignmentType","Exercises").filter("platform_deployment_id","https://www.chem4ap.com").list();
+		List<Assignment> assignmentList = ofy().load().type(Assignment.class).filter("assignmentType","Exercises").filter("platform_deployment_id",Util.getServerUrl()).list();
 		Map<Long,Assignment> assignmentMap = new HashMap<Long,Assignment>();
 		for (Assignment a : assignmentList) assignmentMap.put(a.unitId, a);
 		

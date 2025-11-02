@@ -63,7 +63,7 @@ public class User {
 	}
 
 	User(String email) {  // constructor for independent student user
-		this.platformId = "https://www.chem4ap.com";
+		this.platformId = Util.getServerUrl();
 		String user_id = platformId + "/" + email;
 		this.hashedId = Util.hashId(user_id);
 		this.exp = new Date(new Date().getTime() + 5400000L);  // value expires 90 minutes from now

@@ -487,10 +487,10 @@ public class Question implements Serializable, Cloneable {
 			buf.append("<b>The answer submitted was: </b><br/>" + studentAnswer + "<br/>");
 		} else {
 			buf.append("<b>The answer submitted was: " + studentAnswer + "</b>&nbsp;");
-			if (this.isCorrect(studentAnswer)) buf.append("&nbsp;<IMG SRC=https://www.chem4ap.com/images/checkmark.gif ALT='Check mark' align=bottom>");
-			else if (this.agreesToRequiredPrecision(studentAnswer)) buf.append("<IMG SRC=https://www.chem4ap.com/images/partCredit.png ALT='minus 1 sig figs' align=middle>"
+			if (this.isCorrect(studentAnswer)) buf.append("&nbsp;<img src='/images/checkmark.gif' alt='Check mark' align=bottom>");
+			else if (this.agreesToRequiredPrecision(studentAnswer)) buf.append("<img src='/images/partCredit.png' alt='minus 1 sig figs' align=middle>"
 					+ "<br/>Your answer must have exactly " + significantFigures + " significant digits.<br/>If your answer ends in a zero, then it must also have a decimal point to indicate which digits are significant.");
-			else buf.append("<IMG SRC=https://www.chem4ap.com/images/xmark.png ALT='X mark' align=middle>");
+			else buf.append("<img src='/images/xmark.png' alt='X mark' align=middle>");
 			buf.append("<br/><br/>");
 		}
 		

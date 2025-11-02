@@ -121,7 +121,7 @@ public class Util {
 				+ "  <meta name='description' content='Chem4AP is an LTI app for teaching and learning AP Chemistry.' />\n"
 				+ "  <meta http-equiv='Cache-Control' content='no-cache, no-store, must-revalidate' />\n"
 				+ "  <link rel='icon' href='images/logo.png' />\n"
-				+ "  <link rel='canonical' href='https://www.chem4ap.com' />\n"
+				+ "  <link rel='canonical' href='" + Util.getServerUrl() + "' />\n"
 				+ "  <title>Chem4P" + (title==null?"":" | " + title) + "</title>\n"
 				+ "  <!-- Font Family -->\n"
 				+ "  <link href='https://fonts.googleapis.com/css2?family=Poppins:wght@100;200;300;400;500;600;700;800;900&family=Shantell+Sans:wght@300;400;500;600;700;800&display=swap' rel='stylesheet'/>\n"
