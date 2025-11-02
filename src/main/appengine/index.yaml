@@ -15,3 +15,9 @@ indexes:
   - name: assignmentType
   - name: topicId
   - name: type
+  
+- kind: Voucher
+  properties:
+  - name: activated
+  - name: org
+  - name: purchased

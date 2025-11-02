@@ -16,14 +16,14 @@ public class Voucher {
 	@Index	Date activated;
 			int months;
 			int paid;
-			String org;
+	@Index	String org;
 	
 	public Voucher() {}
 	
-	public Voucher(String org,int price) {
+	public Voucher(String org,int price,int nMonths) {
 		this.code = Integer.toHexString(1048576 + new Random().nextInt(15728640)).toUpperCase(); // 6-character HEX
 		this.purchased = new Date();
-		this.months = 12;
+		this.months = nMonths;
 		this.paid = price;
 		this.org = org;
 	}
