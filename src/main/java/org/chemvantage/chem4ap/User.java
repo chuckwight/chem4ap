@@ -21,6 +21,7 @@ import static com.googlecode.objectify.ObjectifyService.ofy;
 import static com.googlecode.objectify.ObjectifyService.key;
 
 import java.util.Date;
+import java.util.List;
 import java.util.Random;
 
 import com.googlecode.objectify.annotation.Entity;
@@ -297,6 +298,11 @@ public class User {
 				ofy().save().entity(this).now();	
 			}
 		}
+		// delete >9 expired users from the datastore
+		//int nExpiredUsers = ofy().load().type(User.class).filter("exp <",new Date()).count();
+		//if (nExpiredUsers < 10) return;
+		List<User> expiredUsers = ofy().load().type(User.class).filter("exp <",new Date()).list();
+		ofy().delete().entities(expiredUsers);
 	}
 
 }

@@ -59,7 +59,7 @@ public class Launch extends HttpServlet {
 			email = claims.getSubject();
 			JWT.require(algorithm).build().verify(claims);
 			User user = new User(email);
-			ofy().save().entity(user);
+			ofy().save().entity(user).now();
 			buf.append(unitSelectForm(user));
 		} catch (TokenExpiredException e1) {
 			Date now = new Date();
@@ -126,7 +126,7 @@ public class Launch extends HttpServlet {
 			}
 			user.setAssignment(a.id);
 			APChemUnit u = ofy().load().type(APChemUnit.class).id(unitId).safe();
-			if (user.isPremium() || u.unitNumber==0) response.sendRedirect(Util.getServerUrl() + "/exercises/index.html?t=" + Util.getToken(user.getTokenSignature()));
+			if (user.isPremium() || u.unitNumber==0) response.sendRedirect(Util.getServerUrl() + "/" + a.assignmentType.toLowerCase() + "/index.html?t=" + Util.getToken(user.getTokenSignature()));
 			else response.sendRedirect("/checkout?sig=" + user.getTokenSignature());
 			return;
 		} catch (Exception e) {}
