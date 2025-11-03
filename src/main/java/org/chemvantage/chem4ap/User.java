@@ -33,7 +33,7 @@ public class User {
 	@Id 	Long 	sig;
 	@Index 	String  hashedId;   		   // used to check for duplicate stored values
 	@Index	Date 	exp;				   // max 90 minutes from now
-			String  encryptedId;		   // stored sin database temporarily in encrypted form
+	@Index	String  encryptedId;		   // stored sin database temporarily in encrypted form
 			String	platformId;			   // URL of the LMS
 	@Index	long	assignmentId = 0L;     // used only for LTI users
 			int 	roles = 0;             // student/learner
@@ -66,9 +66,15 @@ public class User {
 	User(String email) {  // constructor for independent student user
 		this.platformId = Util.getServerUrl();
 		String user_id = platformId + "/" + email;
-		this.hashedId = Util.hashId(user_id);
-		this.exp = new Date(new Date().getTime() + 5400000L);  // value expires 90 minutes from now
 		this.encryptedId = encryptId(user_id,0L);  // temporary until sig is assigned in setToken()
+		try {
+			User user = ofy().load().type(User.class).filter("encryptedId",encryptedId).first().safe();
+			this.sig = user.sig;
+			this.hashedId = user.hashedId;
+		} catch (Exception e) {
+			this.hashedId = Util.hashId(user_id);
+		}
+		this.exp = new Date(new Date().getTime() + 5400000L);  // value expires 90 minutes from now
 	}
 	
 	User(String platformId, String id) {  // used for LTI 1.3 and LTIDeepLinks launches

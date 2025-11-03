@@ -178,6 +178,9 @@ public class Exercises extends HttpServlet {
 			+ q.getCorrectAnswer());
 
 		buf.append("Your score on this assignment is " + s.totalScore + "%");
+		if (s.totalScore==100 && user.platformId.equals(Util.getServerUrl())) {  // independent user; not LTI
+			buf.append("&nbsp;<a href='/launch?sig=" + user.getTokenSignature() + "'><button class='btn btn-primary'>Finish</button></a>");
+		}
 		
 		JsonObject responseJson = new JsonObject();
 		responseJson.addProperty("token",Util.getToken(sig));

@@ -44,6 +44,15 @@ public class Launch extends HttpServlet {
 		response.setContentType("text/html");
 		PrintWriter out = response.getWriter();
 		
+		String sig = request.getParameter("sig");
+		if (sig!=null) {
+			User user = User.getUser(sig);
+			if (user!=null) {
+				out.println(Util.head("Chem4AP Login") + Util.banner + unitSelectForm(user) + Util.foot());
+				return;
+			} else response.sendRedirect(Util.getServerUrl());
+		}
+		
 		String token = request.getParameter("t");
 		if (token==null) {
 			response.sendRedirect(Util.getServerUrl());
@@ -175,9 +184,9 @@ public class Launch extends HttpServlet {
 	String unitSelectForm(User user) {
 		StringBuffer buf = new StringBuffer("<h1>Select a Unit</h1>");
 		if (!user.isPremium()) {
-			buf.append("Your free trial account includes access to Unit 0 - Prepare for AP Chemistry. "
+			buf.append("<div style='max-width:600px'>Your free trial account includes access to Unit 0 - Prepare for AP Chemistry. "
 					+ "This will give you a feel for how to use the app by progressing through the different types of questions. "
-					+ "If you start Units 1-9 you will be asked to purchase a subscription.<br/><br/>");
+					+ "If you start Units 1-9 you will be asked to purchase a subscription.</div><br/><br/>");
 		}
 		List<APChemUnit> units = ofy().load().type(APChemUnit.class).order("unitNumber").list();
 		
