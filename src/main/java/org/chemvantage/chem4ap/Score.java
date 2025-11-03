@@ -121,10 +121,12 @@ public class Score {
 		currentQuestionId = getNewQuestionId();
 		
 		// Create a Task to report the score to the LMS
-		if (totalScore >= maxScore) { // only report if maxScore increases
+		if (totalScore > maxScore) { // only report if maxScore increases
 			maxScore = totalScore;
-			String payload = "AssignmentId=" + id + "&UserId=" + URLEncoder.encode(user.getId(),"UTF-8");
-			Util.createTask("/report",payload);
+			if (!user.platformId.equals(Util.getServerUrl())) {
+				String payload = "AssignmentId=" + id + "&UserId=" + URLEncoder.encode(user.getId(),"UTF-8");
+				Util.createTask("/report",payload);
+			}
 		}
 		
 		ofy().save().entity(this).now();
