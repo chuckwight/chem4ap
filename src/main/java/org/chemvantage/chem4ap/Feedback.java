@@ -88,11 +88,15 @@ public class Feedback extends HttpServlet {
 		String msg = "On " + r.submitted + " a problem report was submitted by ";
 		String email = user.hashedId;
 		try {
-			Long assignmentId = user.getAssignmentId();
-			Assignment a = ofy().load().type(Assignment.class).id(assignmentId).safe();
-			Map<String,String[]> contextMembership = LTIMessage.getMembership(a);
-			String rawId = userId.substring(userId.lastIndexOf("/")+1);
-			email = contextMembership.get(rawId)[2];
+			if (user.platformId.equals(Util.getServerUrl())) {  // independent user
+				email = user.getId();
+			} else {											// LTI user
+				Long assignmentId = user.getAssignmentId();
+				Assignment a = ofy().load().type(Assignment.class).id(assignmentId).safe();
+				Map<String,String[]> contextMembership = LTIMessage.getMembership(a);
+				String rawId = userId.substring(userId.lastIndexOf("/")+1);
+				email = contextMembership.get(rawId)[2];
+			}
 		} catch (Exception e) {}  // failed to retrieve email address
 		msg += email + "<br/>" + r.view();
 		try {
